@@ -1,0 +1,895 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>FreeWorld Portal</title>
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#0a1541">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FreeWorld">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap">
+<style>
+/* Layout: the FreeWorld site's navy and royal blue, with the Artist Portal's tabbed board inside: stage tiles, collapsible stage groups, and a side panel per song, job or operation. */
+:root{
+  --bg:#0a1541; --surface:#0f1c50; --raise:#15245e; --ink:#f2f4fb; --muted:#9ba7d1; --line:#24357a;
+  --accent:#6f8dff; --accent-ink:#d3dcff; --accent-soft:#1b2c72; --on-accent:#08113a;
+  --ok:#5cc08a; --warn:#f0a85a; --bad:#ff8a78;
+  --sans:"Hanken Grotesk","Helvetica Neue",Arial,sans-serif;
+  --serif:"Instrument Serif",Georgia,serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5;padding:calc(18px + env(safe-area-inset-top,0px)) 16px calc(48px + env(safe-area-inset-bottom,0px))}
+.wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+button{font:inherit;cursor:pointer;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+h1{font-weight:700;font-size:clamp(30px,6vw,44px);letter-spacing:-.03em;line-height:1;margin:6px 0 0}
+h1 em{font-family:var(--serif);font-weight:400;font-style:italic;color:var(--accent)}
+.who{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.who b{color:var(--ink);font-weight:600}
+.btn{background:var(--accent);color:var(--on-accent);border:0;border-radius:8px;padding:10px 16px;font-weight:600}
+.btn:disabled{opacity:.6;cursor:default}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn.sm{padding:6px 11px;font-size:13px}
+.link{border:0;background:transparent;color:var(--accent);font-weight:600;padding:4px 0;font-size:13px;align-self:flex-start}
+.tabs{display:flex;gap:2px;overflow-x:auto;border-bottom:1px solid var(--line);scrollbar-width:none}
+.tab{border:0;background:transparent;color:var(--muted);padding:10px 14px;border-bottom:2px solid transparent;white-space:nowrap;font-weight:500;font-size:15px}
+.tab[aria-selected="true"]{color:var(--ink);border-color:var(--accent)}
+.tab .n{font-size:12px;margin-left:6px;color:var(--muted)}
+.intro{color:var(--muted);margin:0;max-width:70ch}
+.banner{border:1px dashed var(--line);background:var(--surface);border-radius:8px;padding:10px 12px;font-size:13px;color:var(--muted);margin:0}
+.banner.err{border-color:var(--bad);color:var(--bad)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:10px}
+.tile{display:flex;flex-direction:column;gap:2px;text-align:left;border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:12px 14px}
+.tile:hover{border-color:var(--accent)}
+.tile[aria-pressed="true"]{border-color:var(--accent);background:var(--accent);color:var(--on-accent)}
+.tile span{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:inherit;opacity:.75}
+.tile b{font-size:28px;line-height:1.1;font-variant-numeric:tabular-nums;font-weight:600}
+.filters{display:flex;flex-direction:column;gap:10px;border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:12px 14px}
+.frow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.flabel{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);width:64px;flex:none}
+.chip{border:1px solid var(--line);background:transparent;border-radius:999px;padding:5px 12px;font-size:13px}
+.chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.chip .c{font-size:11px;color:var(--muted);margin-left:5px}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+.status{font-size:12px;color:var(--muted)}
+.groups{display:flex;flex-direction:column;gap:14px}
+.groups>*{flex-shrink:0}
+.ghead{display:flex;align-items:center;gap:10px;width:100%;border:0;background:transparent;padding:6px 2px;text-align:left}
+.chev{width:22px;height:22px;border-radius:5px;border:1px solid var(--line);display:grid;place-items:center;font-size:10px;color:var(--muted);transition:transform .15s;flex:none}
+[aria-expanded="false"]>.chev{transform:rotate(-90deg)}
+.ghead h2{font-size:17px;font-weight:600;margin:0}
+.ghead small{font-size:12px;color:var(--muted)}
+.ghead .rule{flex:1;height:1px;background:var(--line)}
+.rows{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;background:var(--surface);overflow:hidden;margin-top:6px}
+.row{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1.6fr) 120px;gap:14px;padding:12px 14px;border:0;border-bottom:1px solid var(--line);background:transparent;text-align:left;width:100%}
+.row:last-child{border-bottom:0}
+.row:hover{background:var(--raise)}
+.t{font-weight:600;min-width:0}
+.meta{font-size:12px;color:var(--muted);display:block;margin-top:2px;font-weight:400}
+.next{min-width:0}
+.next em{font-style:normal;color:var(--muted)}
+.mini{display:flex;gap:3px;margin-top:6px;max-width:220px}
+.mini i{flex:1;height:4px;border-radius:2px;background:var(--line);overflow:hidden;position:relative}
+.mini i b{position:absolute;inset:0 auto 0 0;background:var(--accent)}
+.due{font-size:12px;font-variant-numeric:tabular-nums;text-align:right;color:var(--muted)}
+.due.soon{color:var(--warn)}.due.late{color:var(--bad)}
+.tag{display:inline-block;font-size:10px;letter-spacing:.08em;text-transform:uppercase;border-radius:4px;padding:1px 6px;margin-left:6px;vertical-align:2px;font-weight:600;background:var(--accent-soft);color:var(--accent-ink)}
+.tag.warn{background:transparent;border:1px solid var(--warn);color:var(--warn)}
+@media (max-width:640px){.row{grid-template-columns:1fr}.due{text-align:left}}
+.empty{border:1px dashed var(--line);border-radius:10px;padding:24px;text-align:center;color:var(--muted)}
+.section-title{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:14px;padding-top:18px;border-top:1px solid var(--line)}
+.section-title h2{font-size:22px;margin:0;font-weight:600}
+.projects{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.proj{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:14px;text-align:left;display:flex;flex-direction:column;gap:10px;min-width:0}
+.proj:hover{border-color:var(--accent)}
+.proj b{font-size:17px;line-height:1.2}
+.bar{height:8px;border-radius:99px;background:var(--raise);border:1px solid var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent);border-radius:99px}
+.pct{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted)}
+/* sign in */
+.signin{max-width:420px;margin:8vh auto 0;display:flex;flex-direction:column;gap:18px}
+.signin h1{font-size:clamp(34px,8vw,48px)}
+.signin form{display:flex;flex-direction:column;gap:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:18px}
+.signin .msg{min-height:20px;font-size:13px;color:var(--muted);margin:0}
+.signin .msg.err{color:var(--bad)}
+.code{font-size:26px;letter-spacing:.4em;text-align:center;font-variant-numeric:tabular-nums}
+/* forms */
+textarea,input,select{font:inherit;color:var(--ink);background:var(--raise);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%;min-width:0}
+input[type=date]{color-scheme:dark}
+textarea{min-height:72px;resize:vertical}
+input:disabled,select:disabled,textarea:disabled{opacity:.7}
+label{display:flex;flex-direction:column;gap:4px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px}
+.span2{grid-column:1/-1}
+@media (max-width:480px){.facts{grid-template-columns:1fr}}
+/* panel */
+.drawer{position:fixed;inset:0;background:rgba(3,8,30,.6);display:flex;justify-content:flex-end;z-index:10}
+.panel{background:var(--bg);width:min(640px,100%);height:100%;display:flex;flex-direction:column;border-left:1px solid var(--line)}
+.p-head{background:var(--surface);border-bottom:1px solid var(--line);padding:16px 18px 14px;padding-top:calc(16px + env(safe-area-inset-top,0px));display:flex;flex-direction:column;gap:10px}
+.p-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.close{border:1px solid var(--line);background:transparent;border-radius:8px;width:34px;height:34px;font-size:18px;line-height:1}
+.title-in{font-size:24px;font-weight:700;border:0;background:transparent;padding:2px 0;border-bottom:1px dashed transparent;border-radius:0;letter-spacing:-.02em}
+.title-in:hover,.title-in:focus{border-bottom-color:var(--line);outline:0}
+.p-sub{color:var(--muted);font-size:13px}
+.seg{display:grid;gap:4px}
+.seg div{display:flex;flex-direction:column;gap:5px;min-width:0}
+.seg i{height:8px;border-radius:3px;background:var(--line);position:relative;overflow:hidden}
+.seg i b{position:absolute;inset:0 auto 0 0;background:var(--accent)}
+.seg span{font-size:10px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.seg .now span{color:var(--ink);font-weight:600}
+.where{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:13px}
+.where span{color:var(--muted)}
+.p-body{flex:1;overflow:auto;padding:16px 18px 20px;display:flex;flex-direction:column;gap:12px;-webkit-overflow-scrolling:touch}
+.p-body>*{flex-shrink:0}
+.p-foot{background:var(--surface);border-top:1px solid var(--line);padding:12px 18px calc(12px + env(safe-area-inset-bottom,0px));display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center}
+.danger{color:var(--bad)!important}
+.stg{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.stg.now{border-color:var(--accent)}
+.stg-h{display:flex;align-items:center;gap:10px;width:100%;border:0;background:transparent;padding:12px 14px;text-align:left}
+.stg-h h4{font-size:15px;margin:0;flex:1;font-weight:600}
+.stg-h .cnt{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.stg-b{border-top:1px solid var(--line);padding:4px 14px 10px}
+.stg-b.pad{padding:12px 14px 14px;display:flex;flex-direction:column;gap:10px}
+.tk{display:grid;grid-template-columns:auto minmax(0,1fr) 140px;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.tk:last-child{border-bottom:0}
+.tk.op{grid-template-columns:auto minmax(0,1fr) 140px 132px auto}
+.tk>input[type=checkbox]{width:20px;height:20px;accent-color:var(--accent);margin:0}
+.tk.done .nm>span,.tk.done .nm>input{color:var(--muted);text-decoration:line-through}
+.tk select,.tk input[type=text],.tk input[type=date]{padding:6px 8px;font-size:13px}
+.tk .nm input{background:transparent;border-color:transparent}
+.tk .nm input:hover,.tk .nm input:focus{border-color:var(--line);background:var(--raise)}
+.tk .inline{margin-top:6px}
+.log{grid-column:2/-1;display:flex;flex-direction:column;gap:6px;padding:2px 0 4px}
+.ent{display:grid;grid-template-columns:80px minmax(0,1fr) auto auto;gap:6px;align-items:center}
+.ent .lbl{font-size:12px;color:var(--muted)}
+.ent input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent)}
+.x{border:0;background:transparent;color:var(--muted);font-size:20px;line-height:1;padding:4px 6px}
+@media (max-width:520px){.tk{grid-template-columns:auto minmax(0,1fr)}.tk select{grid-column:2}.tk.op{grid-template-columns:auto minmax(0,1fr) auto}.tk.op select,.tk.op input[type=date]{grid-column:2}.log{grid-column:1/-1}}
+.addtask{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding-top:8px}
+.ptitle{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:10px 0 0;font-weight:600}
+.hint{margin:0;color:var(--muted);font-size:13px}
+.cr{display:grid;grid-template-columns:170px minmax(0,1fr) auto;gap:6px;align-items:center}
+.cr.one{grid-template-columns:minmax(0,1fr) auto}
+@media (max-width:480px){.cr{grid-template-columns:120px minmax(0,1fr) auto}}
+.grid-rows{display:flex;flex-direction:column;gap:6px}
+.sp-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.sp-h h5{font-size:14px;margin:0;font-weight:600}
+.kv{display:flex;flex-direction:column}
+.kv div{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}
+.kv div:last-child{border-bottom:0}
+.kv span{color:var(--muted)}
+.kv b{font-weight:500;text-align:right;font-variant-numeric:tabular-nums}
+.toggle{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;flex-wrap:wrap}
+.toggle button{border:0;background:var(--raise);color:var(--muted);padding:7px 12px;font-size:13px;font-weight:500}
+.toggle button+button{border-left:1px solid var(--line)}
+.toggle button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}
+.relrow{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.relrow .flabel{width:auto}
+.pills{display:flex;flex-wrap:wrap;gap:6px}
+.pill{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;color:var(--muted);background:transparent}
+button.pill[aria-pressed="true"]{border-color:var(--accent);color:var(--accent-ink);background:var(--accent-soft)}
+.yn{display:flex;gap:14px;align-items:center;padding-top:4px}
+.yn label{flex-direction:row;align-items:center;gap:6px;text-transform:none;font-size:14px;letter-spacing:0;color:var(--ink)}
+.yn input{width:auto;accent-color:var(--accent)}
+.saving{opacity:.6;pointer-events:none}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;vertical-align:-2px;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<!-- sign in -->
+<div class="signin" id="signin" hidden>
+  <div>
+    <div class="eyebrow">FreeWorld</div>
+    <h1>Artist <em>Portal</em></h1>
+  </div>
+  <form id="emailForm" novalidate>
+    <label for="email">Your email</label>
+    <input id="email" type="email" autocomplete="email" inputmode="email" placeholder="you@gmail.com" required>
+    <button class="btn" type="submit" id="emailBtn">Send me a code</button>
+    <p class="msg" id="emailMsg">We'll email you a 6-digit code. Use the email FreeWorld has on file for you.</p>
+  </form>
+  <form id="codeForm" novalidate hidden>
+    <label for="code">Code sent to <span id="codeTo"></span></label>
+    <input id="code" class="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••" required>
+    <button class="btn" type="submit" id="codeBtn">Sign in</button>
+    <button class="link" type="button" id="codeBack">Use a different email</button>
+    <p class="msg" id="codeMsg">The code works for 10 minutes. Check spam if it hasn't arrived.</p>
+  </form>
+</div>
+
+<!-- app -->
+<div class="wrap" id="app" hidden>
+  <header>
+    <div>
+      <div class="eyebrow">FreeWorld · Own your $hit</div>
+      <h1>Artist <em>Portal</em></h1>
+    </div>
+    <div class="who"><span id="whoText"></span><button class="btn ghost sm" type="button" id="refreshBtn">Refresh</button><button class="btn ghost sm" type="button" id="signOut">Sign out</button></div>
+  </header>
+  <nav class="tabs" id="tabs" role="tablist" aria-label="Sections"></nav>
+  <p class="banner" id="appMsg" hidden></p>
+  <main id="view"><div class="empty"><span class="spin"></span>Loading your portal…</div></main>
+</div>
+
+<div class="drawer" id="drawer" hidden>
+  <!-- song -->
+  <form class="panel" id="songForm" hidden novalidate>
+    <div class="p-head">
+      <div class="p-top"><span class="eyebrow">Originals</span><button class="close" type="button" data-close aria-label="Close">×</button></div>
+      <input class="title-in" id="s_title" placeholder="Song title" aria-label="Song title">
+      <div class="p-sub" id="s_sub"></div>
+      <div class="seg" id="s_seg" aria-hidden="true"></div>
+      <div class="where" id="s_where"></div>
+      <div class="relrow"><span class="flabel">Release</span><div class="toggle" role="group" aria-label="Release status"><button type="button" id="relNo">Unreleased</button><button type="button" id="relYes">Released</button></div></div>
+    </div>
+    <div class="p-body">
+      <div id="s_stages" class="groups" style="gap:10px"></div>
+      <h3 class="ptitle">Song information</h3>
+      <section class="stg">
+        <button class="stg-h" type="button" aria-expanded="true" data-toggle><span class="chev">▼</span><h4>Song details</h4></button>
+        <div class="stg-b pad">
+          <div class="facts">
+            <label>Project<select id="s_project"></select></label>
+            <label>Release date<input id="s_due" type="date"></label>
+            <label class="span2">Notes<textarea id="s_notes"></textarea></label>
+          </div>
+        </div>
+      </section>
+      <section class="stg">
+        <button class="stg-h" type="button" aria-expanded="false" data-toggle><span class="chev">▼</span><h4>Credits</h4><span class="cnt" id="s_credCnt"></span></button>
+        <div class="stg-b pad" hidden>
+          <div class="sp-h"><h5>Artists</h5><span class="status" id="s_artCnt"></span></div>
+          <div class="grid-rows" id="s_artists"></div>
+          <button class="link" type="button" id="s_addArtist">+ Add artist</button>
+          <div class="sp-h" style="margin-top:8px"><h5>Other credits</h5></div>
+          <div class="grid-rows" id="s_credits"></div>
+          <button class="link" type="button" id="s_addCredit">+ Add credit</button>
+        </div>
+      </section>
+      <section class="stg">
+        <button class="stg-h" type="button" aria-expanded="false" data-toggle><span class="chev">▼</span><h4>Metadata</h4><span class="cnt" id="s_metaCnt"></span></button>
+        <div class="stg-b pad" hidden><div class="facts" id="s_meta"></div></div>
+      </section>
+      <section class="stg">
+        <button class="stg-h" type="button" aria-expanded="false" data-toggle><span class="chev">▼</span><h4>Splits &amp; rights</h4><span class="cnt">Team only</span></button>
+        <div class="stg-b pad" hidden><p class="hint">Splits and rights are managed by the FreeWorld team.</p><div id="s_splits" class="groups" style="gap:12px"></div></div>
+      </section>
+      <p class="status" id="s_status"></p>
+    </div>
+    <div class="p-foot"><span class="status" id="s_lock"></span><span style="display:flex;gap:8px"><button class="btn ghost" type="button" data-close>Cancel</button><button class="btn" type="submit">Save</button></span></div>
+  </form>
+
+  <!-- project -->
+  <form class="panel" id="projForm" hidden novalidate>
+    <div class="p-head">
+      <div class="p-top"><span class="eyebrow">Project</span><button class="close" type="button" data-close aria-label="Close">×</button></div>
+      <input class="title-in" id="pr_name" placeholder="EP, album or mixtape name" aria-label="Project name">
+      <div class="bar"><i id="pr_bar" style="width:0"></i></div>
+      <div class="where"><b id="pr_pct"></b><span id="pr_cnt"></span></div>
+    </div>
+    <div class="p-body">
+      <section class="stg"><div class="stg-b pad" style="border-top:0">
+        <div class="sp-h"><h5>Tracks</h5></div>
+        <div class="kv" id="pr_tracks"></div>
+      </div></section>
+      <section class="stg"><div class="stg-b pad" style="border-top:0">
+        <div class="facts">
+          <label>Artist<input id="pr_artist"></label>
+          <label>Type<select id="pr_type"></select></label>
+          <label>Planned tracks<input id="pr_planned" type="number" min="0" step="1" inputmode="numeric"></label>
+          <label>Target release<input id="pr_due" type="date"></label>
+          <label class="span2">Notes<textarea id="pr_notes"></textarea></label>
+        </div>
+      </div></section>
+      <p class="status" id="pr_status"></p>
+    </div>
+    <div class="p-foot"><span class="status" id="pr_lock"></span><span style="display:flex;gap:8px"><button class="btn ghost" type="button" data-close>Cancel</button><button class="btn" type="submit">Save</button></span></div>
+  </form>
+
+  <!-- client job -->
+  <form class="panel" id="jobForm" hidden novalidate>
+    <div class="p-head">
+      <div class="p-top"><span class="eyebrow">Client Work</span><button class="close" type="button" data-close aria-label="Close">×</button></div>
+      <input class="title-in" id="j_title" placeholder="Song or job name" aria-label="Song or job name">
+      <div class="p-sub" id="j_sub"></div>
+      <div class="seg" id="j_seg" aria-hidden="true"></div>
+      <div class="where" id="j_where"></div>
+    </div>
+    <div class="p-body">
+      <div id="j_stages" class="groups" style="gap:10px"></div>
+      <h3 class="ptitle">Job information</h3>
+      <section class="stg">
+        <button class="stg-h" type="button" aria-expanded="true" data-toggle><span class="chev">▼</span><h4>Job details</h4></button>
+        <div class="stg-b pad">
+          <div class="facts">
+            <label>Client<input id="j_client" placeholder="Artist, film or company"></label>
+            <label>Client type<select id="j_ctype"></select></label>
+            <label>Primary artist<input id="j_primary" list="nameList"></label>
+            <label>Other artists<input id="j_others" list="nameList" placeholder="Comma separated"></label>
+            <label>Package<select id="j_pkg"></select></label>
+            <label>Deadline<input id="j_due" type="date"></label>
+          </div>
+          <div class="relrow"><span class="flabel">Co-ordinator</span><div class="toggle" role="group" aria-label="Co-ordinator" id="j_owner"></div></div>
+          <div class="frow"><span class="flabel">Extras</span><div class="pills" id="j_extras"></div></div>
+          <p class="hint">Changing the package or extras updates the task list at the next hourly sync with the Studio Desk.</p>
+        </div>
+      </section>
+      <section class="stg">
+        <button class="stg-h" type="button" aria-expanded="false" data-toggle><span class="chev">▼</span><h4>Credits</h4><span class="cnt" id="j_credCnt"></span></button>
+        <div class="stg-b pad" hidden><div class="grid-rows" id="j_credits"></div><button class="link" type="button" id="j_addCredit">+ Add credit</button></div>
+      </section>
+      <section class="stg">
+        <button class="stg-h" type="button" aria-expanded="false" data-toggle><span class="chev">▼</span><h4>Invoice &amp; payments</h4><span class="cnt" id="j_moneyCnt"></span></button>
+        <div class="stg-b pad" hidden><div class="kv" id="j_money"></div><p class="hint">Invoice and payments are kept by the FreeWorld team.</p></div>
+      </section>
+      <section class="stg">
+        <button class="stg-h" type="button" aria-expanded="false" data-toggle><span class="chev">▼</span><h4>Notes</h4></button>
+        <div class="stg-b pad" hidden><textarea id="j_notes" aria-label="Notes"></textarea></div>
+      </section>
+      <p class="hint" id="j_syncnote"></p>
+      <p class="status" id="j_status"></p>
+    </div>
+    <div class="p-foot"><span class="status" id="j_lock"></span><span style="display:flex;gap:8px"><button class="btn ghost" type="button" data-close>Cancel</button><button class="btn" type="submit">Save</button></span></div>
+  </form>
+
+  <!-- operation -->
+  <form class="panel" id="opForm" hidden novalidate>
+    <div class="p-head">
+      <div class="p-top"><span class="eyebrow">Other Operations</span><button class="close" type="button" data-close aria-label="Close">×</button></div>
+      <input class="title-in" id="o_title" placeholder="What needs doing, e.g. Galeez shoot" aria-label="Operation title">
+      <div class="p-sub" id="o_sub"></div>
+      <div class="bar"><i id="o_bar" style="width:0"></i></div>
+      <div class="where"><b id="o_pct"></b><span id="o_cnt"></span></div>
+    </div>
+    <div class="p-body">
+      <section class="stg">
+        <div class="stg-h" style="cursor:default"><h4>Tasks</h4><span class="cnt" id="o_taskCnt"></span></div>
+        <div class="stg-b">
+          <div id="o_tasks"></div>
+          <div class="addtask" id="o_addRow"><input type="text" id="o_new" placeholder="Add a task and press Enter" aria-label="New task"><button class="btn ghost sm" type="button" id="o_add">Add</button></div>
+        </div>
+      </section>
+      <section class="stg">
+        <button class="stg-h" type="button" aria-expanded="true" data-toggle><span class="chev">▼</span><h4>Details</h4></button>
+        <div class="stg-b pad">
+          <div class="facts">
+            <label>Artist<select id="o_artist"></select></label>
+            <label>Due<input id="o_due" type="date"></label>
+            <label class="span2">Notes<textarea id="o_notes"></textarea></label>
+          </div>
+        </div>
+      </section>
+      <p class="status" id="o_status"></p>
+    </div>
+    <div class="p-foot"><button class="btn ghost danger" type="button" id="o_del">Delete</button><span style="display:flex;gap:8px;margin-left:auto"><button class="btn ghost" type="button" data-close>Cancel</button><button class="btn" type="submit">Save</button></span></div>
+  </form>
+</div>
+<datalist id="nameList"></datalist>
+
+<script>
+/* The backend: the FreeWorld Apps Script web app (runs as studiofreeworld and filters everything per person). */
+const API="";
+const TOKEN_KEY="fw_portal_token",EMAIL_KEY="fw_portal_email";
+
+/* The fixed song workflow, same task ids and order as the Catalogue sheet. */
+const FLOW=[
+  {stage:"A&R",tasks:[{id:"ar_align",name:"Creative alignment"},{id:"ar_lyricist",name:"Find lyricist"},{id:"ar_producer",name:"Find producer"},{id:"ar_collab",name:"Find collaborator"}]},
+  {stage:"Production",tasks:[{id:"p_hook",name:"Hook idea"},{id:"p_verse",name:"Verse idea"},{id:"p_lyrics",name:"Lyrics idea"},{id:"p_topline",name:"Complete topline"},{id:"p_arr",name:"Arrangement & production",log:"sessions",unit:"Session",hint:"What was done in this session"},{id:"p_rec",name:"Recording"}]},
+  {stage:"Mix & Master",tasks:[{id:"m_engineer",name:"Lock engineer",field:"engineer",fieldHint:"Engineer's name"},{id:"m_stems",name:"Deliver stems"},{id:"m_versions",name:"Versions & feedback",log:"mixVersions",unit:"Version",hint:"Our feedback on this version"},{id:"m_locked",name:"Final mix & master locked"}]},
+  {stage:"Distribution",tasks:[{id:"d_contracts",name:"Contracts"},{id:"d_deliver",name:"Deliver to distributor"},{id:"d_artwork",name:"Lock artwork"},{id:"d_approval",name:"Get approval"},{id:"d_playlists",name:"Pitch to playlists"},{id:"d_accounts",name:"Accounts"}]},
+  {stage:"Marketing & Visuals",tasks:[{id:"mk_plan",name:"Make marketing plan"},{id:"mk_content",name:"Make content plan"},{id:"mk_video",name:"Make music video"},{id:"mk_creators",name:"Deploy creators"},{id:"mk_ads",name:"Deploy ads"},{id:"mk_shoot",name:"Shoot content"}]}
+];
+const SONG_STAGES=[...FLOW.map(f=>f.stage),"Released"];
+const CREDIT_ROLES=["Lyricist","Composer","Producer","Mix engineer","Mastering engineer","Recording engineer","Vocalist","Featured artist","Arranger","Musician","Music video director","Vocal producer","Session musician"];
+const META=[
+  {id:"isrc",label:"ISRC"},{id:"upc",label:"UPC / EAN"},{id:"language",label:"Language"},{id:"genre",label:"Genre"},
+  {id:"subgenre",label:"Sub-genre"},{id:"mood",label:"Mood"},{id:"duration",label:"Duration",ph:"3:24"},{id:"bpm",label:"BPM"},
+  {id:"key",label:"Key",ph:"e.g. F# minor"},{id:"explicit",label:"Explicit",type:"yn"},{id:"featuring",label:"Featured artists",wide:true},
+  {id:"label",label:"Label"},{id:"distributor",label:"Distributor"},{id:"pline",label:"℗ line"},{id:"cline",label:"© line"}
+];
+const RIGHTS=[["master","Master recording"],["publishing","Publishing"],["performance","Performance royalties"],["mechanical","Mechanical royalties"],["neighbouring","Neighbouring rights"],["sync","Sync licensing"],["distribution","Distribution"],["video","Music video & visuals"],["remix","Remixes & derivatives"],["artwork","Artwork"]];
+const PTYPES=["EP","Album","Mixtape","Soundtrack","Single"];
+const PKGS={A1:"Beatlab Basic",A2:"Beatlab Plus",A3:"Beatlab Premium",A4:"Beatlab Premium+ (Mastered)",B1:"Wordlab Basic",B2:"Wordlab Premium",C1:"Topline Basic",C2:"Topline Premium",D1:"Studio Basic",D2:"Studio Plus",D3:"Studio Premium",D4:"Studio Premium+ (Mastered)",E1:"Songlab Basic",E2:"Songlab Plus",E3:"Songlab Premium",E4:"Songlab Premium+ (Mastered)"};
+const SERVICES=["Beatlab","Wordlab","Topline","Studio","Songlab"];
+const EXTRAS=["Composition (melody)","Multiple melody options","Lyrics","Multiple thematic directions","Scratch demo","In-studio topline session","Full production (arrangement, structure, sound design)","Live instrument recording","Basic vocal production (light tuning + comping)","Advanced vocal production","In-studio time","Premix","Professional stereo mix & master","Dolby / Atmos mix"];
+const CLIENT_TYPES=["Independent artist","Film","Label","Brand","Other"];
+const JOB_STAGES=["Onboarding","A&R","Production","Revisions","Mix & Master","Delivery","Completed"];
+
+let D=null,tab="songs",loadedAt=0,busy=false;
+let fStage="",fProj="All",fSvc="All",fOp="Open",fArtist="All";
+let collapsed={};try{collapsed=JSON.parse(localStorage.getItem("fw_portal_collapsed")||"{}");}catch(e){}
+const saveCollapsed=()=>{try{localStorage.setItem("fw_portal_collapsed",JSON.stringify(collapsed));}catch(e){}};
+const store={get:k=>{try{return localStorage.getItem(k)||"";}catch(e){return "";}},set:(k,v)=>{try{v?localStorage.setItem(k,v):localStorage.removeItem(k);}catch(e){}}};
+
+const $=id=>document.getElementById(id);
+const el=(tag,cls,txt)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e;};
+function fill(sel,opts){sel.innerHTML="";opts.forEach(o=>{const op=el("option",null,o.label??o);op.value=o.value??o;sel.appendChild(op);});}
+const same=(a,b)=>(a||"").trim().toLowerCase()===(b||"").trim().toLowerCase();
+const todayISO=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");};
+const clone=x=>JSON.parse(JSON.stringify(x));
+function dueInfo(d){
+  if(!d)return{txt:"",cls:""};
+  const t=new Date();t.setHours(0,0,0,0);const dt=new Date(d+"T00:00:00");if(isNaN(dt))return{txt:d,cls:""};const days=Math.round((dt-t)/864e5);
+  return{txt:dt.toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}),cls:days<0?"late":days<=14?"soon":""};
+}
+const isTeam=()=>D&&D.me.role==="team";
+const myNames=()=>D?[D.me.name,...((D.aliases||{})[D.me.name]||[])]:[];
+const isMe=n=>myNames().some(m=>same(m,n));
+
+/* ---------- backend calls ---------- */
+async function api(action,body){
+  if(!API)throw new Error("The portal isn't connected yet. FreeWorld is finishing the setup.");
+  let res;
+  try{
+    const r=await fetch(API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(Object.assign({action,token:store.get(TOKEN_KEY)},body||{}))});
+    res=await r.json();
+  }catch(e){throw new Error("Couldn't reach FreeWorld. Check your connection and try again.");}
+  if(res&&res.error){if(res.error==="signed_out"){signOut(res.message);}const e=new Error(res.message||"Something went wrong.");e.code=res.error;throw e;}
+  return res;
+}
+
+/* ---------- sign in ---------- */
+function showSignin(msg){
+  $("app").hidden=true;$("drawer").hidden=true;$("signin").hidden=false;$("codeForm").hidden=true;$("emailForm").hidden=false;
+  $("email").value=store.get(EMAIL_KEY);if(msg){$("emailMsg").textContent=msg;$("emailMsg").className="msg err";}
+  setTimeout(()=>$("email").focus(),50);
+}
+function signOut(msg){store.set(TOKEN_KEY,"");D=null;showSignin(msg);}
+$("emailForm").addEventListener("submit",async e=>{
+  e.preventDefault();const email=$("email").value.trim();const m=$("emailMsg");
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){m.textContent="Enter a valid email address.";m.className="msg err";return;}
+  $("emailBtn").disabled=true;m.className="msg";m.textContent="Sending…";
+  try{await api("requestCode",{email});store.set(EMAIL_KEY,email);$("codeTo").textContent=email;$("emailForm").hidden=true;$("codeForm").hidden=false;$("code").value="";$("codeMsg").className="msg";$("codeMsg").textContent="The code works for 10 minutes. Check spam if it hasn't arrived.";$("code").focus();}
+  catch(err){if(err.code==="wait"){$("codeTo").textContent=email;$("emailForm").hidden=true;$("codeForm").hidden=false;$("codeMsg").className="msg";$("codeMsg").textContent=err.message;$("code").focus();}else{m.textContent=err.message;m.className="msg err";}}
+  finally{$("emailBtn").disabled=false;}
+});
+$("code").addEventListener("input",()=>{$("code").value=$("code").value.replace(/\D/g,"").slice(0,6);if($("code").value.length===6)$("codeForm").requestSubmit();});
+$("codeForm").addEventListener("submit",async e=>{
+  e.preventDefault();const code=$("code").value.trim();const m=$("codeMsg");if(code.length!==6||busy)return;
+  busy=true;$("codeBtn").disabled=true;m.className="msg";m.textContent="Checking…";
+  try{const r=await api("verifyCode",{email:$("codeTo").textContent,code});store.set(TOKEN_KEY,r.token);$("signin").hidden=true;start();}
+  catch(err){m.textContent=err.message;m.className="msg err";if(err.code==="code_expired"){$("codeForm").hidden=true;$("emailForm").hidden=false;$("emailMsg").textContent=err.message;$("emailMsg").className="msg err";}}
+  finally{busy=false;$("codeBtn").disabled=false;}
+});
+$("codeBack").onclick=()=>{$("codeForm").hidden=true;$("emailForm").hidden=false;$("email").focus();};
+$("signOut").onclick=()=>signOut("");
+
+/* ---------- loading ---------- */
+async function start(){
+  $("app").hidden=false;$("signin").hidden=true;
+  if(!D)$("view").innerHTML='<div class="empty"><span class="spin"></span>Loading your portal…</div>';
+  await reload();
+}
+async function reload(){
+  try{D=await api("load");loadedAt=Date.now();appMsg("");render();}
+  catch(err){if(err.code==="signed_out")return;if(D){appMsg(err.message,true);}else{$("view").innerHTML="";$("view").appendChild(el("div","empty",err.message));}}
+}
+function appMsg(t,err){const m=$("appMsg");m.hidden=!t;m.textContent=t||"";m.className="banner"+(err?" err":"");}
+$("refreshBtn").onclick=async()=>{const b=$("refreshBtn");b.disabled=true;b.textContent="Refreshing…";await reload();b.disabled=false;b.textContent="Refresh";};
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&D&&$("drawer").hidden&&Date.now()-loadedAt>60000)reload();});
+
+/* ---------- maths ---------- */
+function songStats(flow){
+  flow=flow||{};
+  const per=FLOW.map(f=>({stage:f.stage,done:f.tasks.filter(t=>flow[t.id]?.done).length,total:f.tasks.length}));
+  const all=per.reduce((n,p)=>n+p.total,0),done=per.reduce((n,p)=>n+p.done,0);const cur=per.findIndex(p=>p.done<p.total);
+  let next=null;if(cur>=0){const t=FLOW[cur].tasks.find(t=>!flow[t.id]?.done);next={name:t.name,who:flow[t.id]?.who||""};}
+  return{per,cur,stage:cur<0?"Released":FLOW[cur].stage,pct:Math.round(done/all*100),next,done,all};
+}
+const songStage=s=>s.released?"Released":songStats(s.flow).stage;
+const songOpen=s=>songStage(s)!=="Released";
+function jobStats(tasks){
+  const stages=[...JOB_STAGES.slice(0,-1).filter(st=>tasks.some(t=>t.stage===st)),...[...new Set(tasks.map(t=>t.stage))].filter(st=>!JOB_STAGES.includes(st))];
+  const per=stages.map(st=>{const ts=tasks.filter(t=>t.stage===st);return{stage:st,done:ts.filter(t=>t.done).length,total:ts.length};});
+  const all=tasks.length,done=tasks.filter(t=>t.done).length;const cur=per.findIndex(p=>p.done<p.total);
+  let next=null;if(cur>=0){const t=tasks.find(t=>t.stage===per[cur].stage&&!t.done);next={name:t.name,who:t.who};}
+  return{stages,per,cur,stage:!all?"Onboarding":cur<0?"Completed":per[cur].stage,pct:all?Math.round(done/all*100):0,next,done,all};
+}
+const jobStage=j=>j.tasks.length?jobStats(j.tasks).stage:(j.stage||"Onboarding");
+const opDone=o=>o.tasks.length>0&&o.tasks.every(t=>t.done);
+const svcOf=j=>(PKGS[j.pkg]||"").split(" ")[0];
+
+/* ---------- board ---------- */
+function render(){
+  if(!D)return;
+  $("whoText").textContent="";$("whoText").append(isTeam()?"FreeWorld team · ":"Artist · ");$("whoText").appendChild(el("b",null,D.me.name));
+  renderTabs();
+  const dl=$("nameList");dl.innerHTML="";[...new Set([...D.artists,...D.team,...myNames()])].forEach(n=>{const o=el("option");o.value=n;dl.appendChild(o);});
+  if(tab==="jobs")renderJobs();else if(tab==="ops")renderOps();else renderSongs();
+}
+function renderTabs(){
+  const t=$("tabs");t.innerHTML="";
+  [["songs","Originals",D.songs.filter(songOpen).length],["jobs","Client Work",D.jobs.filter(j=>jobStage(j)!=="Completed").length],["ops","Other Operations",D.ops.filter(o=>!opDone(o)).length]].forEach(([k,label,n])=>{
+    const b=el("button","tab",label);b.type="button";b.setAttribute("role","tab");b.setAttribute("aria-selected",String(tab===k));if(n)b.appendChild(el("span","n",n));
+    b.onclick=()=>{tab=k;fStage="";fProj="All";fSvc="All";fArtist="All";render();window.scrollTo({top:0});};t.appendChild(b);});
+}
+function chipRow(label,opts,cur,set,counts){
+  const r=el("div","frow");r.appendChild(el("span","flabel",label));const c=el("div","pills");
+  opts.forEach(o=>{const b=el("button","chip",o);b.type="button";b.setAttribute("aria-pressed",String(cur===o));if(counts&&counts[o]!=null)b.appendChild(el("span","c",counts[o]));b.onclick=()=>{set(o);render();};c.appendChild(b);});
+  r.appendChild(c);return r;
+}
+function stageTiles(box,stages,list,stageOf){
+  const tiles=el("div","tiles");
+  stages.forEach(st=>{const n=list.filter(i=>stageOf(i)===st).length;const on=fStage===st;
+    const b=el("button","tile");b.type="button";b.setAttribute("aria-pressed",String(on));b.onclick=()=>{fStage=on?"":st;render();};
+    b.append(el("span",null,st),el("b",null,n));tiles.appendChild(b);});
+  box.appendChild(tiles);
+}
+function groups(box,key,stages,list,stageOf,rowFn,unit){
+  const shown=fStage?[fStage]:stages;let any=false;
+  shown.forEach(s=>{
+    const its=list.filter(i=>stageOf(i)===s).sort((a,b)=>(a.due||"9999").localeCompare(b.due||"9999"));if(!its.length)return;any=true;
+    const id=key+"|"+s;const open=!!fStage||!collapsed[id];
+    const g=el("section");const h=el("button","ghead");h.type="button";h.setAttribute("aria-expanded",String(open));
+    h.append(el("span","chev","▼"),el("h2",null,s),el("small",null,its.length+" "+unit+(its.length===1?"":"s")),el("span","rule"));
+    const rows=el("div","rows");rows.hidden=!open;its.forEach(i=>rows.appendChild(rowFn(i)));
+    h.onclick=()=>{const now=rows.hidden;rows.hidden=!now;h.setAttribute("aria-expanded",String(now));if(now)delete collapsed[id];else collapsed[id]=1;saveCollapsed();};
+    g.append(h,rows);box.appendChild(g);
+  });
+  if(!any)box.appendChild(el("div","empty",list.length?"Nothing here matches.":"Nothing here yet."));
+}
+function miniBar(per){const m=el("div","mini");per.forEach(p=>{const i=el("i");const b=el("b");b.style.width=(p.total?p.done/p.total*100:0)+"%";i.appendChild(b);m.appendChild(i);});return m;}
+
+/* Originals */
+const songProj=s=>s.project||"Singles";
+function renderSongs(){
+  const v=$("view");v.innerHTML="";const box=el("div","groups");
+  box.appendChild(el("p","intro",isTeam()?"Every FreeWorld original. Songs move through the stages as their tasks get ticked off.":"Songs you're on. Each song moves through the stages as its tasks get ticked off. You can edit songs where you're one of the artists."));
+  const names=[...new Set(D.projects.map(p=>p.name))];if(fProj!=="All"&&fProj!=="Singles"&&!names.includes(fProj))fProj="All";
+  const list=D.songs.filter(s=>fProj==="All"||songProj(s)===fProj);
+  stageTiles(box,SONG_STAGES,list,songStage);
+  const pc={All:D.songs.length};D.songs.forEach(s=>{const n=songProj(s);pc[n]=(pc[n]||0)+1;});
+  const f=el("div","filters");f.appendChild(chipRow("Project",["All",...names.filter(n=>pc[n]),...(pc.Singles?["Singles"]:[])],fProj,x=>fProj=x,pc));box.appendChild(f);
+  const tb=el("div","toolbar");tb.appendChild(el("span","status",list.length+" song"+(list.length===1?"":"s")));
+  const add=el("button","btn ghost sm","+ Add a song");add.type="button";add.onclick=()=>openSong(null);tb.appendChild(add);box.appendChild(tb);
+  groups(box,"songs",SONG_STAGES,list,songStage,songRow,"song");
+  renderProjects(box);v.appendChild(box);
+}
+function songRow(s){
+  const st=songStats(s.flow);const r=el("button","row");r.type="button";r.onclick=()=>openSong(s);
+  const t=el("div","t",s.title);if(!s.editable)t.appendChild(el("span","tag","View only"));
+  t.appendChild(el("span","meta",[s.artists.join(", "),s.project||"Single"].filter(Boolean).join(" · ")));
+  const n=el("div","next");
+  if(st.next){n.append(el("span",null,(s.released?"Released · open: ":"Next: ")+st.next.name));if(st.next.who)n.appendChild(el("span","meta",st.next.who));}
+  else n.appendChild(el("em",null,"All stages complete"));
+  n.appendChild(miniBar(st.per));
+  const di=dueInfo(s.due);const past=s.due&&s.due<todayISO();r.append(t,n,el("div","due "+(past?"":di.cls),s.due?(past?"Out "+di.txt:di.txt):"No release date"));return r;
+}
+function projStats(p){
+  const tr=D.songs.filter(s=>s.project===p.name);const planned=Math.max(Number(p.planned)||0,tr.length);
+  const prog=s=>s.released?1:songStats(s.flow).pct/100;
+  return{tr,planned,done:tr.filter(s=>!songOpen(s)).length,pct:planned?Math.round(tr.reduce((n,s)=>n+prog(s),0)/planned*100):0};
+}
+function renderProjects(box){
+  const head=el("div","section-title");head.appendChild(el("h2",null,"Projects"));
+  const add=el("button","btn ghost sm","+ New project");add.type="button";add.onclick=()=>openProj(null);head.appendChild(add);box.appendChild(head);
+  const list=D.projects.filter(p=>fProj==="All"||p.name===fProj).sort((a,b)=>(a.due||"9999").localeCompare(b.due||"9999"));
+  if(!list.length){box.appendChild(el("div","empty","No projects here yet."));return;}
+  const grid=el("div","projects");
+  list.forEach(p=>{const s=projStats(p);const b=el("button","proj");b.type="button";b.onclick=()=>openProj(p);
+    const tl=el("div");tl.append(el("b",null,p.name),el("span","meta",[p.type,p.artist,p.due?"Target "+dueInfo(p.due).txt:""].filter(Boolean).join(" · ")));
+    const bar=el("div","bar");const fb=el("i");fb.style.width=s.pct+"%";bar.appendChild(fb);
+    const pc=el("div","pct");pc.append(el("span",null,s.pct+"% complete"),el("span",null,s.done+" of "+s.planned+" released"));
+    b.append(tl,bar,pc);grid.appendChild(b);});
+  box.appendChild(grid);
+}
+
+/* Client Work */
+function renderJobs(){
+  const v=$("view");v.innerHTML="";const box=el("div","groups");
+  box.appendChild(el("p","intro",isTeam()?"Songwriting jobs from the Studio Desk. Changes here reach the Desk at the next hourly sync.":"Songwriting jobs you're on. Tick tasks and update details here; FreeWorld sees your changes at the next hourly sync."));
+  const list=D.jobs.filter(j=>fSvc==="All"||svcOf(j)===fSvc);
+  stageTiles(box,JOB_STAGES,list,jobStage);
+  const sc={All:D.jobs.length};SERVICES.forEach(s=>sc[s]=D.jobs.filter(j=>svcOf(j)===s).length);
+  const f=el("div","filters");f.appendChild(chipRow("Service",["All",...SERVICES.filter(s=>sc[s])],fSvc,x=>fSvc=x,sc));box.appendChild(f);
+  const tb=el("div","toolbar");tb.appendChild(el("span","status",list.length+" job"+(list.length===1?"":"s")));
+  const add=el("button","btn ghost sm","+ New client job");add.type="button";add.onclick=()=>openJob(null);tb.appendChild(add);box.appendChild(tb);
+  groups(box,"jobs",JOB_STAGES,list,jobStage,jobRow,"job");v.appendChild(box);
+}
+function jobRow(j){
+  const st=jobStats(j.tasks);const r=el("button","row");r.type="button";r.onclick=()=>openJob(j);
+  const t=el("div","t",j.title||"Untitled job");if(!j.id)t.appendChild(el("span","tag warn","Waiting for sync"));
+  t.appendChild(el("span","meta",[j.client||"No client",j.primary&&!same(j.primary,j.client)?"Artist: "+j.primary:"",j.pkg?j.pkg+" · "+PKGS[j.pkg]:"",j.owner?"Co-ordinator: "+j.owner:""].filter(Boolean).join(" · ")));
+  const n=el("div","next");
+  if(st.next){n.append(el("span",null,"Next: "+st.next.name));if(st.next.who)n.appendChild(el("span","meta",st.next.who));}
+  else n.appendChild(el("em",null,j.tasks.length?"Job complete":"Tasks appear after the next sync"));
+  if(st.per.length)n.appendChild(miniBar(st.per));
+  const di=dueInfo(j.due);r.append(t,n,el("div","due "+(st.cur<0&&j.tasks.length?"":di.cls),j.due?di.txt:"No deadline"));return r;
+}
+
+/* Other Operations */
+function renderOps(){
+  const v=$("view");v.innerHTML="";const box=el("div","groups");
+  box.appendChild(el("p","intro","Everything else that needs doing: shoots, contracts, meetings, travel, admin. Each card holds its own tasks, and each task can go to the artist or someone in the FreeWorld team."));
+  const arts=[...new Set(D.ops.map(o=>o.artist||"FreeWorld"))].sort();if(fArtist!=="All"&&!arts.includes(fArtist))fArtist="All";
+  const scoped=D.ops.filter(o=>fArtist==="All"||(o.artist||"FreeWorld")===fArtist);
+  const cnt={Open:scoped.filter(o=>!opDone(o)).length,Done:scoped.filter(opDone).length,"My tasks":scoped.filter(o=>o.tasks.some(t=>!t.done&&isMe(t.who))).length};
+  const f=el("div","filters");f.appendChild(chipRow("Show",["Open","My tasks","Done"],fOp,x=>fOp=x,cnt));
+  if(isTeam()&&arts.length>1){const ac={All:D.ops.length};arts.forEach(a=>ac[a]=D.ops.filter(o=>(o.artist||"FreeWorld")===a).length);f.appendChild(chipRow("Artist",["All",...arts],fArtist,x=>fArtist=x,ac));}
+  box.appendChild(f);
+  const list=scoped.filter(o=>fOp==="Done"?opDone(o):fOp==="My tasks"?o.tasks.some(t=>!t.done&&isMe(t.who)):!opDone(o)).sort((a,b)=>(a.due||"9999").localeCompare(b.due||"9999"));
+  const tb=el("div","toolbar");tb.appendChild(el("span","status",list.length+" operation"+(list.length===1?"":"s")));
+  const add=el("button","btn ghost sm","+ New operation");add.type="button";add.onclick=()=>openOp(null);tb.appendChild(add);box.appendChild(tb);
+  if(!list.length)box.appendChild(el("div","empty",D.ops.length?"Nothing here.":"No operations yet. Add one for anything that isn't a song or a client job."));
+  else{const rows=el("div","rows");list.forEach(o=>rows.appendChild(opRow(o)));box.appendChild(rows);}
+  v.appendChild(box);
+}
+function opRow(o){
+  const r=el("button","row");r.type="button";r.onclick=()=>openOp(o);
+  const t=el("div","t",o.title||"Untitled");t.appendChild(el("span","meta",[o.artist||"FreeWorld",o.createdBy?"Added by "+o.createdBy:""].filter(Boolean).join(" · ")));
+  const n=el("div","next");const open=o.tasks.filter(x=>!x.done);const mine=open.filter(x=>isMe(x.who));
+  if(!o.tasks.length)n.appendChild(el("em",null,"No tasks yet"));
+  else if(!open.length)n.appendChild(el("em",null,"All "+o.tasks.length+" tasks done"));
+  else{const nx=(mine[0]||open[0]);n.append(el("span",null,"Next: "+nx.name));n.appendChild(el("span","meta",[nx.who||"Unassigned",open.length+" of "+o.tasks.length+" open",mine.length?mine.length+" yours":""].filter(Boolean).join(" · ")));}
+  if(o.tasks.length){const bar=el("div","mini");const i=el("i");const b=el("b");b.style.width=(o.tasks.filter(x=>x.done).length/o.tasks.length*100)+"%";i.appendChild(b);bar.appendChild(i);n.appendChild(bar);}
+  const di=dueInfo(o.due);r.append(t,n,el("div","due "+(opDone(o)?"":di.cls),o.due?di.txt:"No due date"));return r;
+}
+
+/* ---------- panels ---------- */
+function show(form){["songForm","projForm","jobForm","opForm"].forEach(f=>$(f).hidden=f!==form);$("drawer").hidden=false;$(form).querySelector(".p-body").scrollTop=0;document.body.style.overflow="hidden";}
+function closeDrawer(){$("drawer").hidden=true;document.body.style.overflow="";render();}
+document.querySelectorAll("[data-close]").forEach(b=>b.onclick=closeDrawer);
+$("drawer").addEventListener("click",e=>{if(e.target.id==="drawer")closeDrawer();});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("drawer").hidden)closeDrawer();});
+document.querySelectorAll("[data-toggle]").forEach(h=>h.onclick=()=>{const b=h.nextElementSibling;b.hidden=!b.hidden;h.setAttribute("aria-expanded",String(!b.hidden));});
+function lockForm(form,locked,msgId,msg){
+  form.querySelectorAll(".p-body input,.p-body select,.p-body textarea,.p-body .link,.p-body .x,.p-body .pill,.p-body .toggle button,.p-head input,.p-head .toggle button").forEach(e=>e.disabled=locked);
+  form.querySelector("button[type=submit]").hidden=locked;$(msgId).textContent=locked?msg:"";
+}
+async function save(form,statusId,action,body){
+  const st=$(statusId);form.classList.add("saving");st.textContent="Saving…";
+  try{D=await api(action,body);loadedAt=Date.now();closeDrawer();}
+  catch(err){st.textContent=err.message;}
+  finally{form.classList.remove("saving");}
+}
+function credRows(boxId,list,onChange){
+  const box=$(boxId);box.innerHTML="";
+  list.forEach((c,k)=>{const r=el("div","cr");const rs=el("select");fill(rs,CREDIT_ROLES.includes(c.role)?CREDIT_ROLES:[c.role,...CREDIT_ROLES]);rs.value=c.role;rs.setAttribute("aria-label","Role");rs.onchange=()=>{c.role=rs.value;};
+    const n=el("input");n.type="text";n.value=c.name||"";n.placeholder="Name";n.setAttribute("list","nameList");n.setAttribute("aria-label","Name");n.oninput=()=>{c.name=n.value;};n.onchange=onChange;
+    const x=el("button","x","×");x.type="button";x.setAttribute("aria-label","Remove credit");x.onclick=()=>{list.splice(k,1);credRows(boxId,list,onChange);onChange();};
+    r.append(rs,n,x);box.appendChild(r);});
+  if(!list.length)box.appendChild(el("p","hint","No credits yet."));
+}
+function whoSelect(val,opts,on){
+  const s=el("select");const o=[{value:"",label:"Unassigned"},...opts.map(n=>({value:n,label:n}))];
+  if(val&&!o.some(x=>same(x.value,val)))o.push({value:val,label:val});
+  fill(s,o);s.value=o.find(x=>same(x.value,val))?.value||"";s.setAttribute("aria-label","Assigned to");s.onchange=()=>on(s.value);return s;
+}
+function segBar(boxId,per,cur){
+  const seg=$(boxId);seg.innerHTML="";seg.style.gridTemplateColumns="repeat("+Math.max(1,per.length)+",minmax(0,1fr))";
+  per.forEach((p,ix)=>{const d=el("div",ix===cur?"now":"");const i=el("i");const b=el("b");b.style.width=(p.total?p.done/p.total*100:0)+"%";i.appendChild(b);d.append(i,el("span",null,p.stage));seg.appendChild(d);});
+}
+
+/* song panel */
+let editSong=null,dS={},sOpen={};
+function openSong(s){
+  editSong=s;dS=s?clone(s):{title:"",artists:isTeam()?[]:[D.me.name],project:fProj!=="All"&&fProj!=="Singles"?fProj:"",released:false,due:"",flow:{},credits:[],meta:{label:"FreeWorld Studios"},engineer:"",sessions:[],mixVersions:[],notes:"",splits:{comp:[],master:[]},rights:{}};
+  FLOW.forEach(f=>f.tasks.forEach(t=>{dS.flow[t.id]=dS.flow[t.id]||{done:false,who:""};}));
+  $("s_title").value=dS.title;$("s_due").value=dS.due;$("s_notes").value=dS.notes;$("s_status").textContent="";
+  fill($("s_project"),[{value:"",label:"Single (no project)"},...D.projects.map(p=>({value:p.name,label:p.name}))]);$("s_project").value=dS.project;
+  sOpen={};drawSongHead();drawSongStages();drawArtists();drawSongCredits();drawMeta();drawSplits();show("songForm");
+  lockForm($("songForm"),!!s&&!s.editable,"s_lock","View only: you can edit songs where you're one of the artists.");
+  if(!s)$("s_title").focus();
+}
+function songWho(){return [...new Set([...D.team,...dS.artists.filter(Boolean),...dS.credits.filter(c=>["Lyricist","Producer","Mix engineer","Mastering engineer","Recording engineer","Composer"].includes(c.role)).map(c=>c.name),dS.engineer].filter(Boolean))];}
+function drawSongHead(){
+  const st=songStats(dS.flow);segBar("s_seg",st.per,st.cur);
+  const w=$("s_where");w.innerHTML="";const l=el("span");l.appendChild(el("b",null,dS.released?"Released":st.cur<0?"All tasks done":"Now in "+st.stage));
+  if(st.next)l.appendChild(document.createTextNode(" · next: "+st.next.name+(st.next.who?" ("+st.next.who+")":"")));
+  l.style.color="var(--ink)";w.append(l,el("span",null,st.pct+"% · "+st.done+" of "+st.all+" tasks"));
+  $("relNo").setAttribute("aria-pressed",String(!dS.released));$("relYes").setAttribute("aria-pressed",String(dS.released));
+  $("s_sub").textContent=[dS.artists.filter(Boolean).join(", ")||"No artist yet",$("s_project").value||"Single"].join("  ·  ");
+}
+$("relNo").onclick=()=>{dS.released=false;drawSongHead();};$("relYes").onclick=()=>{dS.released=true;drawSongHead();};$("s_project").onchange=drawSongHead;
+function drawSongStages(){
+  const box=$("s_stages");box.innerHTML="";const st=songStats(dS.flow);const locked=editSong&&!editSong.editable;
+  FLOW.forEach((f,ix)=>{
+    const p=st.per[ix];const isNow=ix===st.cur;const open=sOpen[f.stage]??isNow;
+    const sec=el("section","stg"+(isNow?" now":""));const h=el("button","stg-h");h.type="button";h.setAttribute("aria-expanded",String(open));
+    h.append(el("span","chev","▼"),el("h4",null,f.stage));if(p.done===p.total)h.appendChild(el("span","tag","Done"));else if(isNow)h.appendChild(el("span","tag","Now"));h.appendChild(el("span","cnt",p.done+"/"+p.total));
+    const body=el("div","stg-b");body.hidden=!open;h.onclick=()=>{sOpen[f.stage]=body.hidden;body.hidden=!body.hidden;h.setAttribute("aria-expanded",String(!body.hidden));};
+    f.tasks.forEach(t=>{
+      const v=dS.flow[t.id];const row=el("div","tk"+(v.done?" done":""));
+      const cb=el("input");cb.type="checkbox";cb.checked=!!v.done;cb.disabled=locked;cb.setAttribute("aria-label",t.name);
+      cb.onchange=()=>{v.done=cb.checked;row.classList.toggle("done",v.done);const before=st.cur;drawSongHead();if(songStats(dS.flow).cur!==before)drawSongStages();};
+      const nm=el("div","nm");nm.appendChild(el("span",null,t.name));
+      if(t.field){const inp=el("input");inp.type="text";inp.className="inline";inp.placeholder=t.fieldHint;inp.value=dS[t.field]||"";inp.disabled=locked;inp.oninput=()=>{dS[t.field]=inp.value;};nm.appendChild(inp);}
+      const ws=whoSelect(v.who,songWho(),w=>{v.who=w;drawSongHead();});ws.disabled=locked;row.append(cb,nm,ws);
+      if(t.log){const log=el("div","log");const arr=dS[t.log];
+        arr.forEach((e,k)=>{const ent=el("div","ent");ent.appendChild(el("span","lbl",t.unit+" "+(k+1)));
+          const note=el("input");note.type="text";note.placeholder=t.hint;note.value=e.note||"";note.disabled=locked;note.oninput=()=>{e.note=note.value;};
+          const c=el("input");c.type="checkbox";c.checked=!!e.done;c.disabled=locked;c.title="Done";c.onchange=()=>{e.done=c.checked;};
+          const x=el("button","x","×");x.type="button";x.disabled=locked;x.setAttribute("aria-label","Remove");x.onclick=()=>{arr.splice(k,1);drawSongStages();};
+          ent.append(note,c,x);log.appendChild(ent);});
+        if(!locked){const add=el("button","link","+ Add "+t.unit.toLowerCase());add.type="button";add.onclick=()=>{arr.push({note:"",done:false});sOpen[f.stage]=true;drawSongStages();};log.appendChild(add);}
+        row.appendChild(log);}
+      body.appendChild(row);});
+    sec.append(h,body);box.appendChild(sec);});
+}
+function drawArtists(){
+  const box=$("s_artists");box.innerHTML="";
+  dS.artists.forEach((a,k)=>{const r=el("div","cr one");const n=el("input");n.type="text";n.value=a;n.placeholder="Artist name";n.setAttribute("list","nameList");n.setAttribute("aria-label","Artist");
+    n.oninput=()=>{dS.artists[k]=n.value;drawSongHead();};const x=el("button","x","×");x.type="button";x.setAttribute("aria-label","Remove artist");x.onclick=()=>{dS.artists.splice(k,1);drawArtists();drawSongHead();};
+    r.append(n,x);box.appendChild(r);});
+  if(!dS.artists.length)box.appendChild(el("p","hint","No artists yet."));
+  $("s_addArtist").hidden=dS.artists.length>=5;$("s_artCnt").textContent=dS.artists.length+" of 5";
+  $("s_credCnt").textContent=(dS.artists.length+dS.credits.length)+" people";
+}
+$("s_addArtist").onclick=()=>{dS.artists.push("");drawArtists();$("s_artists").lastElementChild.querySelector("input").focus();};
+function drawSongCredits(){credRows("s_credits",dS.credits,()=>{$("s_credCnt").textContent=(dS.artists.length+dS.credits.length)+" people";});$("s_credCnt").textContent=(dS.artists.length+dS.credits.length)+" people";}
+$("s_addCredit").onclick=()=>{dS.credits.push({role:"Lyricist",name:""});drawSongCredits();$("s_credits").lastElementChild.querySelector("input").focus();};
+function drawMeta(){
+  const box=$("s_meta");box.innerHTML="";
+  META.forEach(m=>{const l=el("label",m.wide?"span2":null,m.label);
+    if(m.type==="yn"){const w=el("div","yn");["Yes","No"].forEach(v=>{const ll=el("label");const r=el("input");r.type="radio";r.name="meta_"+m.id;r.checked=dS.meta[m.id]===v;r.onchange=()=>{dS.meta[m.id]=v;metaCnt();};ll.append(r,document.createTextNode(v));w.appendChild(ll);});l.appendChild(w);}
+    else{const i=el("input");i.type="text";i.value=dS.meta[m.id]||"";if(m.ph)i.placeholder=m.ph;i.oninput=()=>{dS.meta[m.id]=i.value;metaCnt();};l.appendChild(i);}
+    box.appendChild(l);});
+  metaCnt();
+}
+function metaCnt(){$("s_metaCnt").textContent=META.filter(m=>(dS.meta[m.id]||"").trim()).length+" of "+META.length+" filled";}
+function drawSplits(){
+  const box=$("s_splits");box.innerHTML="";
+  [["Composition (publishing)",dS.splits.comp],["Master (recording)",dS.splits.master]].forEach(([label,arr])=>{
+    const sec=el("div");sec.appendChild(el("h5",null,label));const kv=el("div","kv");
+    if(!arr.length)kv.appendChild(el("p","hint","Not set yet."));
+    arr.forEach(x=>{const d=el("div");d.append(el("span",null,x.name+(x.role?" · "+x.role:"")),el("b",null,x.share+"%"));kv.appendChild(d);});sec.appendChild(kv);box.appendChild(sec);});
+  const rs=RIGHTS.filter(([k])=>dS.rights[k]);if(rs.length){const sec=el("div");sec.appendChild(el("h5",null,"Rights"));const kv=el("div","kv");rs.forEach(([k,n])=>{const d=el("div");d.append(el("span",null,n),el("b",null,dS.rights[k]));kv.appendChild(d);});sec.appendChild(kv);box.appendChild(sec);}
+}
+$("songForm").addEventListener("submit",e=>{
+  e.preventDefault();const st=$("s_status");
+  dS.title=$("s_title").value.trim();dS.due=$("s_due").value;dS.notes=$("s_notes").value.trim();dS.project=$("s_project").value;
+  dS.artists=dS.artists.map(a=>a.trim()).filter(Boolean);dS.credits=dS.credits.filter(c=>(c.name||"").trim());
+  if(!dS.title){st.textContent="Add a title before saving.";$("s_title").focus();return;}
+  if(!dS.artists.length){st.textContent="Add at least one artist before saving.";return;}
+  if(!isTeam()&&!dS.artists.some(isMe)){st.textContent="Keep "+D.me.name+" as one of the artists.";return;}
+  save($("songForm"),"s_status","saveSong",{song:Object.assign({},dS,{id:editSong?editSong.id:""})});
+});
+
+/* project panel */
+let editProj=null;
+fill($("pr_type"),PTYPES);
+function openProj(p){
+  editProj=p;$("pr_name").value=p?.name||"";$("pr_artist").value=p?.artist||(isTeam()?"":D.me.name);$("pr_type").value=p?.type||"EP";$("pr_planned").value=p?.planned||"";$("pr_due").value=p?.due||"";$("pr_notes").value=p?.notes||"";$("pr_status").textContent="";
+  const box=$("pr_tracks");box.innerHTML="";
+  if(p){const s=projStats(p);$("pr_pct").textContent=s.pct+"% complete";$("pr_cnt").textContent=s.done+" of "+s.planned+" released";$("pr_bar").style.width=s.pct+"%";
+    s.tr.forEach(x=>{const d=el("div");d.append(el("span",null,x.title),el("b",null,songStage(x)));box.appendChild(d);});
+    if(!s.tr.length)box.appendChild(el("p","hint",isTeam()?"No songs on this project yet.":"No songs of yours on this project yet."));}
+  else{$("pr_pct").textContent="New project";$("pr_cnt").textContent="";$("pr_bar").style.width="0";box.appendChild(el("p","hint","Save the project, then pick it on a song."));}
+  show("projForm");lockForm($("projForm"),!!p&&!p.editable,"pr_lock","View only: you can edit projects where you're the artist.");
+  $("pr_name").disabled=!!p&&(!p.editable||!isTeam());if(!p)$("pr_name").focus();
+}
+$("projForm").addEventListener("submit",e=>{
+  e.preventDefault();const body={name:$("pr_name").value.trim(),artist:$("pr_artist").value.trim(),type:$("pr_type").value,planned:$("pr_planned").value,due:$("pr_due").value,notes:$("pr_notes").value.trim()};
+  if(!body.name){$("pr_status").textContent="Add a project name before saving.";return;}
+  save($("projForm"),"pr_status","saveProject",{project:body,oldName:editProj?editProj.name:""});
+});
+
+/* job panel */
+let editJob=null,dJ={},jOpen={};
+fill($("j_ctype"),CLIENT_TYPES);fill($("j_pkg"),Object.entries(PKGS).map(([k,v])=>({value:k,label:k+" · "+v})));
+function openJob(j){
+  editJob=j;dJ=j?clone(j):{id:"",title:"",client:"",clientType:"Independent artist",primary:isTeam()?"":D.me.name,others:[],pkg:"E2",extras:[],owner:"",due:"",credits:[],notes:"",tasks:[],payments:[]};
+  dJ.tasks.forEach(t=>t.isNew=false);
+  $("j_title").value=dJ.title;$("j_client").value=dJ.client;$("j_ctype").value=CLIENT_TYPES.includes(dJ.clientType)?dJ.clientType:"Other";$("j_primary").value=dJ.primary;$("j_others").value=dJ.others.join(", ");
+  $("j_pkg").value=dJ.pkg||"E2";$("j_due").value=dJ.due;$("j_notes").value=dJ.notes;$("j_status").textContent="";
+  jOpen={};jDrawOwner();jDrawExtras();jDrawHead();jDrawStages();jDrawCredits();jDrawMoney();
+  $("j_syncnote").textContent=!j?"New jobs reach the Studio Desk at the next hourly sync, and their task list appears after that.":!j.id?"This job is waiting for the hourly sync with the Studio Desk. You can change it once it has synced.":j.updated?"Last changed in the Studio Desk "+j.updated+".":"";
+  show("jobForm");lockForm($("jobForm"),!!j&&!j.editable,"j_lock","Waiting for sync");if(!j)$("j_title").focus();
+}
+function jDrawOwner(){const box=$("j_owner");box.innerHTML="";D.team.forEach(t=>{const b=el("button",null,t);b.type="button";b.setAttribute("aria-pressed",String(dJ.owner===t));b.onclick=()=>{dJ.owner=dJ.owner===t?"":t;jDrawOwner();jDrawHead();};box.appendChild(b);});}
+function jDrawExtras(){const box=$("j_extras");box.innerHTML="";EXTRAS.forEach(x=>{const on=dJ.extras.includes(x);const b=el("button","pill",(on?"✓ ":"+ ")+x);b.type="button";b.setAttribute("aria-pressed",String(on));b.onclick=()=>{dJ.extras=on?dJ.extras.filter(y=>y!==x):[...dJ.extras,x];jDrawExtras();};box.appendChild(b);});}
+function jWho(){return [...new Set([...D.team,$("j_primary").value.trim(),...$("j_others").value.split(",").map(x=>x.trim()),...dJ.credits.map(c=>c.name),$("j_client").value.trim()].filter(Boolean))];}
+function jDrawHead(){
+  const st=jobStats(dJ.tasks);segBar("j_seg",st.per,st.cur);
+  const w=$("j_where");w.innerHTML="";const l=el("span");l.style.color="var(--ink)";l.appendChild(el("b",null,!dJ.tasks.length?"No tasks yet":st.cur<0?"Job complete":"Now in "+st.stage));
+  if(st.next)l.appendChild(document.createTextNode(" · next: "+st.next.name+(st.next.who?" ("+st.next.who+")":"")));
+  w.append(l,el("span",null,dJ.tasks.length?st.pct+"% · "+st.done+" of "+st.all+" tasks":""));
+  $("j_sub").textContent=[$("j_client").value.trim()||"No client yet",$("j_pkg").value+" · "+PKGS[$("j_pkg").value],dJ.owner?"Co-ordinator: "+dJ.owner:"No co-ordinator yet"].join("  ·  ");
+}
+["j_client","j_pkg"].forEach(id=>$(id).addEventListener("input",jDrawHead));
+function jDrawStages(){
+  const box=$("j_stages");box.innerHTML="";const st=jobStats(dJ.tasks);const locked=editJob&&!editJob.editable;
+  if(!editJob||!editJob.id)return;
+  const stages=st.stages.length?st.stages:["Production"];
+  stages.forEach((sg,ix)=>{
+    const p=st.per[ix]||{done:0,total:0};const isNow=ix===st.cur;const open=jOpen[sg]??isNow;
+    const sec=el("section","stg"+(isNow?" now":""));const h=el("button","stg-h");h.type="button";h.setAttribute("aria-expanded",String(open));
+    h.append(el("span","chev","▼"),el("h4",null,sg));if(p.total&&p.done===p.total)h.appendChild(el("span","tag","Done"));else if(isNow)h.appendChild(el("span","tag","Now"));h.appendChild(el("span","cnt",p.done+"/"+p.total));
+    const body=el("div","stg-b");body.hidden=!open;h.onclick=()=>{jOpen[sg]=body.hidden;body.hidden=!body.hidden;h.setAttribute("aria-expanded",String(!body.hidden));};
+    dJ.tasks.filter(t=>t.stage===sg).forEach(t=>{
+      const row=el("div","tk"+(t.done?" done":""));const cb=el("input");cb.type="checkbox";cb.checked=t.done;cb.disabled=locked;cb.setAttribute("aria-label",t.name);
+      cb.onchange=()=>{t.done=cb.checked;row.classList.toggle("done",t.done);const before=st.cur;jDrawHead();if(jobStats(dJ.tasks).cur!==before)jDrawStages();};
+      const nm=el("div","nm");nm.appendChild(el("span",null,t.name));if(t.isNew)nm.appendChild(el("span","meta","New · saves with the job"));
+      const ws=whoSelect(t.who,jWho(),w=>{t.who=w;jDrawHead();});ws.disabled=locked;row.append(cb,nm,ws);body.appendChild(row);});
+    if(!locked){const add=el("div","addtask");const ti=el("input");ti.type="text";ti.placeholder="Add a task to "+sg;ti.setAttribute("aria-label","New task in "+sg);const ab=el("button","btn ghost sm","Add");ab.type="button";
+      const go=()=>{const v=ti.value.trim();if(!v)return;dJ.tasks.push({stage:sg,name:v,done:false,who:"",key:"",isNew:true});jOpen[sg]=true;jDrawStages();jDrawHead();};
+      ab.onclick=go;ti.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();go();}});add.append(ti,ab);body.appendChild(add);}
+    sec.append(h,body);box.appendChild(sec);});
+}
+function jDrawCredits(){credRows("j_credits",dJ.credits,()=>{$("j_credCnt").textContent=dJ.credits.length?dJ.credits.length+" people":"";});$("j_credCnt").textContent=dJ.credits.length?dJ.credits.length+" people":"";}
+$("j_addCredit").onclick=()=>{dJ.credits.push({role:"Composer",name:""});jDrawCredits();$("j_credits").lastElementChild.querySelector("input").focus();};
+function jDrawMoney(){
+  const box=$("j_money");box.innerHTML="";const rows=[["Invoice (before GST)",dJ.invoice],["GST",dJ.gst],["Invoice incl. GST",dJ.invoiceTotal],["Received",dJ.received],["Balance due",dJ.balance]].filter(([,v])=>v&&v!=="0.00");
+  const inr=v=>{const n=Number(String(v).replace(/[^\d.]/g,""));return isFinite(n)&&/\d/.test(v)&&!/%/.test(v)?"₹"+n.toLocaleString("en-IN"):v;};
+  rows.forEach(([k,v])=>{const d=el("div");d.append(el("span",null,k),el("b",null,inr(v)));box.appendChild(d);});
+  (dJ.payments||[]).forEach(p=>{const d=el("div");d.append(el("span",null,"Payment "+(p.date||"")+(p.note?" · "+p.note:"")),el("b",null,inr(p.amount)));box.appendChild(d);});
+  if(!box.children.length)box.appendChild(el("p","hint","No invoice yet."));
+  $("j_moneyCnt").textContent=dJ.invoiceTotal?inr(dJ.invoiceTotal)+" incl. GST":"";
+}
+$("jobForm").addEventListener("submit",e=>{
+  e.preventDefault();const st=$("j_status");
+  const body={id:dJ.id||"",row:editJob&&!editJob.id?editJob.row:0,title:$("j_title").value.trim(),client:$("j_client").value.trim(),clientType:$("j_ctype").value,primary:$("j_primary").value.trim(),
+    others:$("j_others").value.split(",").map(x=>x.trim()).filter(Boolean),pkg:$("j_pkg").value,extras:dJ.extras,owner:dJ.owner,due:$("j_due").value,
+    credits:dJ.credits.filter(c=>(c.name||"").trim()),notes:$("j_notes").value.trim(),tasks:dJ.tasks.map(t=>({stage:t.stage,name:t.name,done:!!t.done,who:t.who||"",key:t.key||"",isNew:!!t.isNew}))};
+  if(!body.title){st.textContent="Add a song or job name before saving.";$("j_title").focus();return;}
+  if(!isTeam()&&![body.primary,...body.others,...body.credits.map(c=>c.name)].some(isMe)){st.textContent="Keep "+D.me.name+" on the job as an artist or in the credits.";return;}
+  save($("jobForm"),"j_status","saveJob",{job:body});
+});
+
+/* operation panel */
+let editOp=null,dO={};
+function opWho(){const a=$("o_artist").value;return [...new Set([...(a?[a,...((D.aliases||{})[a]||[])]:[]),...D.team])];}
+function openOp(o){
+  editOp=o;dO=o?clone(o):{id:"",title:"",artist:isTeam()?(fArtist!=="All"&&fArtist!=="FreeWorld"?fArtist:""):D.me.name,due:"",notes:"",tasks:[]};
+  $("o_title").value=dO.title;$("o_due").value=dO.due;$("o_notes").value=dO.notes;$("o_status").textContent="";$("o_new").value="";
+  const arts=isTeam()?[{value:"",label:"FreeWorld (no artist)"},...[...new Set([...D.artists,dO.artist].filter(Boolean))].map(a=>({value:a,label:a}))]:[{value:dO.artist,label:dO.artist||"FreeWorld"}];
+  fill($("o_artist"),arts);$("o_artist").value=dO.artist;
+  const may=!o||o.editable;
+  $("o_title").disabled=!may;$("o_due").disabled=!may;$("o_notes").disabled=!may;$("o_artist").disabled=!may||!isTeam();$("o_addRow").hidden=!may;
+  $("o_del").hidden=!o||!isTeam();
+  oDrawHead();oDrawTasks();show("opForm");if(!o)$("o_title").focus();
+}
+$("o_artist").onchange=()=>{dO.artist=$("o_artist").value;oDrawTasks();oDrawHead();};
+function oDrawHead(){
+  const n=dO.tasks.length,d=dO.tasks.filter(t=>t.done).length;$("o_bar").style.width=(n?d/n*100:0)+"%";
+  $("o_pct").textContent=!n?"No tasks yet":d===n?"All tasks done":(n-d)+" task"+(n-d===1?"":"s")+" open";$("o_cnt").textContent=n?d+" of "+n+" done":"";
+  $("o_sub").textContent=[$("o_artist").value||"FreeWorld",editOp&&editOp.createdBy?"Added by "+editOp.createdBy:""].filter(Boolean).join("  ·  ");
+  $("o_taskCnt").textContent=n?d+"/"+n:"";
+}
+function oDrawTasks(){
+  const box=$("o_tasks");box.innerHTML="";const may=!editOp||editOp.editable;
+  dO.tasks.forEach((t,k)=>{
+    const row=el("div","tk op"+(t.done?" done":""));const cb=el("input");cb.type="checkbox";cb.checked=t.done;cb.disabled=!may&&!isMe(t.who);cb.setAttribute("aria-label","Done");
+    cb.onchange=()=>{t.done=cb.checked;row.classList.toggle("done",t.done);oDrawHead();};
+    const nm=el("div","nm");const tx=el("input");tx.type="text";tx.value=t.name;tx.disabled=!may;tx.setAttribute("aria-label","Task");tx.oninput=()=>{t.name=tx.value;};nm.appendChild(tx);
+    const ws=whoSelect(t.who,opWho(),w=>{t.who=w;});ws.disabled=!may;
+    const du=el("input");du.type="date";du.value=t.due||"";du.disabled=!may;du.setAttribute("aria-label","Task due date");du.oninput=()=>{t.due=du.value;};
+    const x=el("button","x","×");x.type="button";x.hidden=!may;x.setAttribute("aria-label","Remove task");x.onclick=()=>{dO.tasks.splice(k,1);oDrawTasks();oDrawHead();};
+    row.append(cb,nm,ws,du,x);box.appendChild(row);});
+  if(!dO.tasks.length)box.appendChild(el("p","hint",may?"Add the first task below.":"No tasks yet."));
+}
+function oAdd(){const v=$("o_new").value.trim();if(!v)return;dO.tasks.push({id:"",name:v,who:"",due:"",done:false});$("o_new").value="";oDrawTasks();oDrawHead();$("o_new").focus();}
+$("o_add").onclick=oAdd;$("o_new").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();oAdd();}});
+let delArmed=false;
+$("o_del").onclick=()=>{if(!editOp)return;if(!delArmed){delArmed=true;$("o_del").textContent="Tap again to delete";setTimeout(()=>{delArmed=false;$("o_del").textContent="Delete";},3000);return;}
+  delArmed=false;$("o_del").textContent="Delete";save($("opForm"),"o_status","deleteOp",{id:editOp.id});};
+$("opForm").addEventListener("submit",e=>{
+  e.preventDefault();const st=$("o_status");
+  if($("o_new").value.trim())oAdd();
+  const body={id:dO.id||"",title:$("o_title").value.trim(),artist:$("o_artist").value,due:$("o_due").value,notes:$("o_notes").value.trim(),tasks:dO.tasks.filter(t=>(t.name||"").trim()).map(t=>({id:t.id||"",name:t.name.trim(),who:t.who||"",due:t.due||"",done:!!t.done}))};
+  if(!body.title){st.textContent="Give the operation a title before saving.";$("o_title").focus();return;}
+  save($("opForm"),"o_status","saveOp",{op:body});
+});
+
+/* ---------- go ---------- */
+if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+if(store.get(TOKEN_KEY))start();else showSignin("");
+</script>
+</body>
+</html>
