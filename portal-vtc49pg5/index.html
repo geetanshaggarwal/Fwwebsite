@@ -411,7 +411,7 @@ const EXTRAS=["Composition (melody)","Multiple melody options","Lyrics","Multipl
 const CLIENT_TYPES=["Independent artist","Film","Label","Brand","Other"];
 const JOB_STAGES=["Onboarding","A&R","Production","Revisions","Mix & Master","Delivery","Completed"];
 
-let D=null,tab="songs",loadedAt=0,busy=false;
+let D=null,tab="overview",loadedAt=0,busy=false;
 let fStage="",fProj="All",fSvc="All",fOp="Open",fArtist="All";
 let collapsed={};try{collapsed=JSON.parse(localStorage.getItem("fw_portal_collapsed")||"{}");}catch(e){}
 const saveCollapsed=()=>{try{localStorage.setItem("fw_portal_collapsed",JSON.stringify(collapsed));}catch(e){}};
@@ -511,11 +511,11 @@ function render(){
   $("whoText").textContent="";$("whoText").append(isTeam()?"FreeWorld team · ":"Artist · ");$("whoText").appendChild(el("b",null,D.me.name));
   renderTabs();
   const dl=$("nameList");dl.innerHTML="";[...new Set([...D.artists,...D.team,...myNames()])].forEach(n=>{const o=el("option");o.value=n;dl.appendChild(o);});
-  if(tab==="jobs")renderJobs();else if(tab==="ops")renderOps();else renderSongs();
+  if(tab==="overview")renderOverview();else if(tab==="jobs")renderJobs();else if(tab==="ops")renderOps();else renderSongs();
 }
 function renderTabs(){
   const t=$("tabs");t.innerHTML="";
-  [["songs","Originals",D.songs.filter(songOpen).length],["jobs","Client Work",D.jobs.filter(j=>jobStage(j)!=="Completed").length],["ops","Other Operations",D.ops.filter(o=>!opDone(o)).length]].forEach(([k,label,n])=>{
+  [["overview","Overview",attention().mine.length],["songs","Originals",D.songs.filter(songOpen).length],["jobs","Client Work",D.jobs.filter(j=>jobStage(j)!=="Completed").length],["ops","Other Operations",D.ops.filter(o=>!opDone(o)).length]].forEach(([k,label,n])=>{
     const b=el("button","tab",label);b.type="button";b.setAttribute("role","tab");b.setAttribute("aria-selected",String(tab===k));if(n)b.appendChild(el("span","n",n));
     b.onclick=()=>{tab=k;fStage="";fProj="All";fSvc="All";fArtist="All";render();window.scrollTo({top:0});};t.appendChild(b);});
 }
@@ -545,6 +545,56 @@ function groups(box,key,stages,list,stageOf,rowFn,unit){
   if(!any)box.appendChild(el("div","empty",list.length?"Nothing here matches.":"Nothing here yet."));
 }
 function miniBar(per){const m=el("div","mini");per.forEach(p=>{const i=el("i");const b=el("b");b.style.width=(p.total?p.done/p.total*100:0)+"%";i.appendChild(b);m.appendChild(i);});return m;}
+
+/* Overview: every open task assigned to the signed-in person, soonest first, plus next steps nobody has picked up */
+const KIND={song:"Originals",job:"Client Work",op:"Other Operations"};
+const BUCKETS=["Overdue","Due this week","Coming up","No date"];
+function daysTo(d){if(!d)return null;const t=new Date();t.setHours(0,0,0,0);const dt=new Date(d+"T00:00:00");return isNaN(dt)?null:Math.round((dt-t)/864e5);}
+function bucketOf(a){const n=daysTo(a.due);return n==null?"No date":n<0?"Overdue":n<=7?"Due this week":"Coming up";}
+function attention(){
+  const mine=[],free=[];
+  D.songs.forEach(s=>{
+    const flow=s.flow||{};const base={kind:"song",item:s,title:s.title,sub:s.artists.join(", "),due:s.released?"":s.due,dueLbl:"Release"};
+    FLOW.forEach(f=>f.tasks.forEach(t=>{const v=flow[t.id];if(v&&!v.done&&v.who&&isMe(v.who))mine.push(Object.assign({name:t.name,stage:f.stage},base));}));
+    const st=songStats(flow);if(!s.released&&st.next&&!st.next.who&&(isTeam()||s.editable))free.push(Object.assign({name:st.next.name,stage:st.stage},base));
+  });
+  D.jobs.forEach(j=>{
+    const st=jobStats(j.tasks);const base={kind:"job",item:j,title:j.title||"Untitled job",sub:j.client||"",due:st.cur<0&&j.tasks.length?"":j.due,dueLbl:"Deadline"};
+    j.tasks.forEach(t=>{if(!t.done&&t.who&&isMe(t.who))mine.push(Object.assign({name:t.name,stage:t.stage},base));});
+    if(st.next&&!st.next.who&&j.editable)free.push(Object.assign({name:st.next.name,stage:st.stage},base));
+  });
+  D.ops.forEach(o=>{
+    const base={kind:"op",item:o,title:o.title||"Untitled",sub:o.artist||"FreeWorld",dueLbl:"Due"};
+    o.tasks.forEach(t=>{if(!t.done&&t.who&&isMe(t.who))mine.push(Object.assign({},base,{name:t.name,stage:"Operation task",due:t.due||o.due}));});
+    const un=o.tasks.filter(t=>!t.done&&!t.who);
+    if(un.length&&o.editable)free.push(Object.assign({},base,{name:un[0].name,stage:un.length>1?un.length+" tasks unassigned":"Unassigned",due:un[0].due||o.due}));
+  });
+  return{mine,free};
+}
+function attRow(a){
+  const r=el("button","row");r.type="button";r.onclick=()=>openAtt(a);
+  const t=el("div","t",a.name);t.appendChild(el("span","meta",a.stage));
+  const n=el("div","next");n.appendChild(el("span",null,a.title));n.appendChild(el("span","meta",[KIND[a.kind],a.sub].filter(Boolean).join(" · ")));
+  const di=dueInfo(a.due);const late=daysTo(a.due)<0&&a.due;
+  r.append(t,n,el("div","due "+di.cls,a.due?(late?"Overdue · ":"")+a.dueLbl+" "+di.txt:"No date"));return r;
+}
+function openAtt(a){
+  if(a.kind==="song"){openSong(a.item);sOpen[a.stage]=true;drawSongStages();}
+  else if(a.kind==="job"){openJob(a.item);jOpen[a.stage]=true;jDrawStages();}
+  else openOp(a.item);
+}
+function renderOverview(){
+  const v=$("view");v.innerHTML="";const box=el("div","groups");const {mine,free}=attention();
+  box.appendChild(el("p","intro","Hi "+D.me.name+". "+(mine.length?"Here's everything assigned to you that's still open, soonest first. Tap a task to open it and tick it off.":"Nothing is assigned to you right now.")));
+  if(mine.length){stageTiles(box,BUCKETS,mine,bucketOf);groups(box,"overview",BUCKETS,mine,bucketOf,attRow,"task");}
+  else box.appendChild(el("div","empty","You're all caught up."));
+  if(free.length){
+    const head=el("div","section-title");head.append(el("h2",null,"Next up, not assigned"),el("span","status",free.length+" waiting"));box.appendChild(head);
+    box.appendChild(el("p","intro",isTeam()?"The next task on these has no one on it yet. Assign someone so it doesn't stall.":"The next task on your work that no one has picked up yet. Take it on or ask FreeWorld to assign it."));
+    const rows=el("div","rows");free.sort((a,b)=>(a.due||"9999").localeCompare(b.due||"9999")).forEach(a=>rows.appendChild(attRow(a)));box.appendChild(rows);
+  }
+  v.appendChild(box);
+}
 
 /* Originals */
 const songProj=s=>s.project||"Singles";
