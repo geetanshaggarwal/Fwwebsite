@@ -509,7 +509,7 @@ const svcOf=j=>(PKGS[j.pkg]||"").split(" ")[0];
 function render(){
   if(!D)return;
   $("whoText").textContent="";$("whoText").append(isTeam()?"FreeWorld team · ":"Artist · ");$("whoText").appendChild(el("b",null,D.me.name));
-  renderTabs();
+  buildCanon();renderTabs();
   const dl=$("nameList");dl.innerHTML="";[...new Set([...D.artists,...D.team,...myNames()])].forEach(n=>{const o=el("option");o.value=n;dl.appendChild(o);});
   if(tab==="overview")renderOverview();else if(tab==="jobs")renderJobs();else if(tab==="ops")renderOps();else renderSongs();
 }
@@ -517,7 +517,7 @@ function renderTabs(){
   const t=$("tabs");t.innerHTML="";
   [["overview","Overview",attention().mine.length],["songs","Originals",D.songs.filter(songOpen).length],["jobs","Client Work",D.jobs.filter(j=>jobStage(j)!=="Completed").length],["ops","Other Operations",D.ops.filter(o=>!opDone(o)).length]].forEach(([k,label,n])=>{
     const b=el("button","tab",label);b.type="button";b.setAttribute("role","tab");b.setAttribute("aria-selected",String(tab===k));if(n)b.appendChild(el("span","n",n));
-    b.onclick=()=>{tab=k;fStage="";fProj="All";fSvc="All";fArtist="All";render();window.scrollTo({top:0});};t.appendChild(b);});
+    b.onclick=()=>{tab=k;fStage="";fProj="All";fSvc="All";render();window.scrollTo({top:0});};t.appendChild(b);});
 }
 function chipRow(label,opts,cur,set,counts){
   const r=el("div","frow");r.appendChild(el("span","flabel",label));const c=el("div","pills");
@@ -543,6 +543,23 @@ function groups(box,key,stages,list,stageOf,rowFn,unit){
     g.append(h,rows);box.appendChild(g);
   });
   if(!any)box.appendChild(el("div","empty",list.length?"Nothing here matches.":"Nothing here yet."));
+}
+/* Artist filter (team only): one choice kept across tabs; artist aliases fold into the artist's main name */
+let CANON={};
+function buildCanon(){CANON={};(D.artists||[]).forEach(a=>{CANON[a.toLowerCase()]=a;((D.aliases||{})[a]||[]).forEach(x=>{CANON[x.trim().toLowerCase()]=a;});});}
+const canon=n=>{n=(n||"").trim();return CANON[n.toLowerCase()]||n;};
+const splitNames=s=>String(s||"").split(/[,&\n]/).map(x=>x.trim()).filter(Boolean);
+function artistsOf(kind,i){
+  const raw=kind==="song"?i.artists||[]:kind==="job"?[i.primary,...(i.others||[])]:kind==="proj"?splitNames(i.artist):kind==="att"?artistsOf(i.kind,i.item):[i.artist||"FreeWorld"];
+  return [...new Set(raw.filter(Boolean).map(canon))];
+}
+const byArtist=kind=>i=>!isTeam()||fArtist==="All"||artistsOf(kind,i).includes(fArtist);
+function artistChips(f,kind,items){
+  if(!isTeam())return;
+  const c={All:items.length};items.forEach(i=>artistsOf(kind,i).forEach(a=>{c[a]=(c[a]||0)+1;}));
+  const names=Object.keys(c).filter(k=>k!=="All").sort((a,b)=>a.localeCompare(b));
+  if(fArtist!=="All"&&!names.includes(fArtist)){names.push(fArtist);c[fArtist]=0;}
+  if(names.length)f.appendChild(chipRow("Artist",["All",...names],fArtist,x=>fArtist=x,c));
 }
 function miniBar(per){const m=el("div","mini");per.forEach(p=>{const i=el("i");const b=el("b");b.style.width=(p.total?p.done/p.total*100:0)+"%";i.appendChild(b);m.appendChild(i);});return m;}
 
@@ -584,8 +601,10 @@ function openAtt(a){
   else openOp(a.item);
 }
 function renderOverview(){
-  const v=$("view");v.innerHTML="";const box=el("div","groups");const {mine,free}=attention();
+  const v=$("view");v.innerHTML="";const box=el("div","groups");const att=attention();
+  const keep=a=>byArtist(a.kind)(a.item);const mine=att.mine.filter(keep),free=att.free.filter(keep);
   box.appendChild(el("p","intro","Hi "+D.me.name+". "+(mine.length?"Here's everything assigned to you that's still open, soonest first. Tap a task to open it and tick it off.":"Nothing is assigned to you right now.")));
+  if(isTeam()){const f=el("div","filters");artistChips(f,"att",[...att.mine,...att.free]);if(f.children.length)box.appendChild(f);}
   if(mine.length){stageTiles(box,BUCKETS,mine,bucketOf);groups(box,"overview",BUCKETS,mine,bucketOf,attRow,"task");}
   else box.appendChild(el("div","empty","You're all caught up."));
   if(free.length){
@@ -602,10 +621,11 @@ function renderSongs(){
   const v=$("view");v.innerHTML="";const box=el("div","groups");
   box.appendChild(el("p","intro",isTeam()?"Every FreeWorld original. Songs move through the stages as their tasks get ticked off.":"Songs you're on. Each song moves through the stages as its tasks get ticked off. You can edit songs where you're one of the artists."));
   const names=[...new Set(D.projects.map(p=>p.name))];if(fProj!=="All"&&fProj!=="Singles"&&!names.includes(fProj))fProj="All";
-  const list=D.songs.filter(s=>fProj==="All"||songProj(s)===fProj);
+  const inProj=s=>fProj==="All"||songProj(s)===fProj;const byA=byArtist("song");
+  const list=D.songs.filter(s=>inProj(s)&&byA(s));
   stageTiles(box,SONG_STAGES,list,songStage);
-  const pc={All:D.songs.length};D.songs.forEach(s=>{const n=songProj(s);pc[n]=(pc[n]||0)+1;});
-  const f=el("div","filters");f.appendChild(chipRow("Project",["All",...names.filter(n=>pc[n]),...(pc.Singles?["Singles"]:[])],fProj,x=>fProj=x,pc));box.appendChild(f);
+  const sa=D.songs.filter(byA);const pc={All:sa.length};sa.forEach(s=>{const n=songProj(s);pc[n]=(pc[n]||0)+1;});
+  const f=el("div","filters");artistChips(f,"song",D.songs.filter(inProj));f.appendChild(chipRow("Project",["All",...names.filter(n=>pc[n]),...(pc.Singles?["Singles"]:[]),...(fProj!=="All"&&!pc[fProj]?[fProj]:[])],fProj,x=>fProj=x,pc));box.appendChild(f);
   const tb=el("div","toolbar");tb.appendChild(el("span","status",list.length+" song"+(list.length===1?"":"s")));
   const add=el("button","btn ghost sm","+ Add a song");add.type="button";add.onclick=()=>openSong(null);tb.appendChild(add);box.appendChild(tb);
   groups(box,"songs",SONG_STAGES,list,songStage,songRow,"song");
@@ -629,7 +649,7 @@ function projStats(p){
 function renderProjects(box){
   const head=el("div","section-title");head.appendChild(el("h2",null,"Projects"));
   const add=el("button","btn ghost sm","+ New project");add.type="button";add.onclick=()=>openProj(null);head.appendChild(add);box.appendChild(head);
-  const list=D.projects.filter(p=>fProj==="All"||p.name===fProj).sort((a,b)=>(a.due||"9999").localeCompare(b.due||"9999"));
+  const list=D.projects.filter(p=>(fProj==="All"||p.name===fProj)&&(!isTeam()||fArtist==="All"||artistsOf("proj",p).includes(fArtist)||D.songs.some(s=>s.project===p.name&&artistsOf("song",s).includes(fArtist)))).sort((a,b)=>(a.due||"9999").localeCompare(b.due||"9999"));
   if(!list.length){box.appendChild(el("div","empty","No projects here yet."));return;}
   const grid=el("div","projects");
   list.forEach(p=>{const s=projStats(p);const b=el("button","proj");b.type="button";b.onclick=()=>openProj(p);
@@ -644,10 +664,11 @@ function renderProjects(box){
 function renderJobs(){
   const v=$("view");v.innerHTML="";const box=el("div","groups");
   box.appendChild(el("p","intro",isTeam()?"Songwriting jobs from the Studio Desk. Changes here reach the Desk at the next hourly sync.":"Songwriting jobs you're on. Tick tasks and update details here; FreeWorld sees your changes at the next hourly sync."));
-  const list=D.jobs.filter(j=>fSvc==="All"||svcOf(j)===fSvc);
+  const inSvc=j=>fSvc==="All"||svcOf(j)===fSvc;const byA=byArtist("job");const ja=D.jobs.filter(byA);
+  const list=ja.filter(inSvc);
   stageTiles(box,JOB_STAGES,list,jobStage);
-  const sc={All:D.jobs.length};SERVICES.forEach(s=>sc[s]=D.jobs.filter(j=>svcOf(j)===s).length);
-  const f=el("div","filters");f.appendChild(chipRow("Service",["All",...SERVICES.filter(s=>sc[s])],fSvc,x=>fSvc=x,sc));box.appendChild(f);
+  const sc={All:ja.length};SERVICES.forEach(s=>sc[s]=ja.filter(j=>svcOf(j)===s).length);
+  const f=el("div","filters");artistChips(f,"job",D.jobs.filter(inSvc));f.appendChild(chipRow("Service",["All",...SERVICES.filter(s=>sc[s])],fSvc,x=>fSvc=x,sc));box.appendChild(f);
   const tb=el("div","toolbar");tb.appendChild(el("span","status",list.length+" job"+(list.length===1?"":"s")));
   const add=el("button","btn ghost sm","+ New client job");add.type="button";add.onclick=()=>openJob(null);tb.appendChild(add);box.appendChild(tb);
   groups(box,"jobs",JOB_STAGES,list,jobStage,jobRow,"job");v.appendChild(box);
@@ -667,13 +688,12 @@ function jobRow(j){
 function renderOps(){
   const v=$("view");v.innerHTML="";const box=el("div","groups");
   box.appendChild(el("p","intro","Everything else that needs doing: shoots, contracts, meetings, travel, admin. Each card holds its own tasks, and each task can go to the artist or someone in the FreeWorld team."));
-  const arts=[...new Set(D.ops.map(o=>o.artist||"FreeWorld"))].sort();if(fArtist!=="All"&&!arts.includes(fArtist))fArtist="All";
-  const scoped=D.ops.filter(o=>fArtist==="All"||(o.artist||"FreeWorld")===fArtist);
+  const scoped=D.ops.filter(byArtist("op"));
   const cnt={Open:scoped.filter(o=>!opDone(o)).length,Done:scoped.filter(opDone).length,"My tasks":scoped.filter(o=>o.tasks.some(t=>!t.done&&isMe(t.who))).length};
-  const f=el("div","filters");f.appendChild(chipRow("Show",["Open","My tasks","Done"],fOp,x=>fOp=x,cnt));
-  if(isTeam()&&arts.length>1){const ac={All:D.ops.length};arts.forEach(a=>ac[a]=D.ops.filter(o=>(o.artist||"FreeWorld")===a).length);f.appendChild(chipRow("Artist",["All",...arts],fArtist,x=>fArtist=x,ac));}
+  const show=o=>fOp==="Done"?opDone(o):fOp==="My tasks"?o.tasks.some(t=>!t.done&&isMe(t.who)):!opDone(o);
+  const f=el("div","filters");artistChips(f,"op",D.ops.filter(show));f.appendChild(chipRow("Show",["Open","My tasks","Done"],fOp,x=>fOp=x,cnt));
   box.appendChild(f);
-  const list=scoped.filter(o=>fOp==="Done"?opDone(o):fOp==="My tasks"?o.tasks.some(t=>!t.done&&isMe(t.who)):!opDone(o)).sort((a,b)=>(a.due||"9999").localeCompare(b.due||"9999"));
+  const list=scoped.filter(show).sort((a,b)=>(a.due||"9999").localeCompare(b.due||"9999"));
   const tb=el("div","toolbar");tb.appendChild(el("span","status",list.length+" operation"+(list.length===1?"":"s")));
   const add=el("button","btn ghost sm","+ New operation");add.type="button";add.onclick=()=>openOp(null);tb.appendChild(add);box.appendChild(tb);
   if(!list.length)box.appendChild(el("div","empty",D.ops.length?"Nothing here.":"No operations yet. Add one for anything that isn't a song or a client job."));
@@ -729,7 +749,7 @@ function segBar(boxId,per,cur){
 /* song panel */
 let editSong=null,dS={},sOpen={};
 function openSong(s){
-  editSong=s;dS=s?clone(s):{title:"",artists:isTeam()?[]:[D.me.name],project:fProj!=="All"&&fProj!=="Singles"?fProj:"",released:false,due:"",flow:{},credits:[],meta:{label:"FreeWorld Studios"},engineer:"",sessions:[],mixVersions:[],notes:"",splits:{comp:[],master:[]},rights:{}};
+  editSong=s;dS=s?clone(s):{title:"",artists:isTeam()?(fArtist!=="All"&&fArtist!=="FreeWorld"?[fArtist]:[]):[D.me.name],project:fProj!=="All"&&fProj!=="Singles"?fProj:"",released:false,due:"",flow:{},credits:[],meta:{label:"FreeWorld Studios"},engineer:"",sessions:[],mixVersions:[],notes:"",splits:{comp:[],master:[]},rights:{}};
   FLOW.forEach(f=>f.tasks.forEach(t=>{dS.flow[t.id]=dS.flow[t.id]||{done:false,who:""};}));
   $("s_title").value=dS.title;$("s_due").value=dS.due;$("s_notes").value=dS.notes;$("s_status").textContent="";
   fill($("s_project"),[{value:"",label:"Single (no project)"},...D.projects.map(p=>({value:p.name,label:p.name}))]);$("s_project").value=dS.project;
@@ -834,7 +854,7 @@ $("projForm").addEventListener("submit",e=>{
 let editJob=null,dJ={},jOpen={};
 fill($("j_ctype"),CLIENT_TYPES);fill($("j_pkg"),Object.entries(PKGS).map(([k,v])=>({value:k,label:k+" · "+v})));
 function openJob(j){
-  editJob=j;dJ=j?clone(j):{id:"",title:"",client:"",clientType:"Independent artist",primary:isTeam()?"":D.me.name,others:[],pkg:"E2",extras:[],owner:"",due:"",credits:[],notes:"",tasks:[],payments:[]};
+  editJob=j;dJ=j?clone(j):{id:"",title:"",client:"",clientType:"Independent artist",primary:isTeam()?(fArtist!=="All"&&fArtist!=="FreeWorld"?fArtist:""):D.me.name,others:[],pkg:"E2",extras:[],owner:"",due:"",credits:[],notes:"",tasks:[],payments:[]};
   dJ.tasks.forEach(t=>t.isNew=false);
   $("j_title").value=dJ.title;$("j_client").value=dJ.client;$("j_ctype").value=CLIENT_TYPES.includes(dJ.clientType)?dJ.clientType:"Other";$("j_primary").value=dJ.primary;$("j_others").value=dJ.others.join(", ");
   $("j_pkg").value=dJ.pkg||"E2";$("j_due").value=dJ.due;$("j_notes").value=dJ.notes;$("j_status").textContent="";
