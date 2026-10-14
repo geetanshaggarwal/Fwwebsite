@@ -327,7 +327,7 @@ button.pill[aria-pressed="true"]{border-color:var(--accent);color:var(--accent-i
           </div>
           <div class="relrow"><span class="flabel">Co-ordinator</span><div class="toggle" role="group" aria-label="Co-ordinator" id="j_owner"></div></div>
           <div class="frow"><span class="flabel">Extras</span><div class="pills" id="j_extras"></div></div>
-          <p class="hint">Changing the package or extras updates the task list at the next hourly sync with the Studio Desk.</p>
+          <p class="hint">Changing the package or extras updates the task list when you save. Ticked tasks stay ticked.</p>
         </div>
       </section>
       <section class="stg">
@@ -663,7 +663,7 @@ function renderProjects(box){
 /* Client Work */
 function renderJobs(){
   const v=$("view");v.innerHTML="";const box=el("div","groups");
-  box.appendChild(el("p","intro",isTeam()?"Songwriting jobs from the Studio Desk. Changes here reach the Desk at the next hourly sync.":"Songwriting jobs you're on. Tick tasks and update details here; FreeWorld sees your changes at the next hourly sync."));
+  box.appendChild(el("p","intro",isTeam()?"Every songwriting job. Changes save straight to the Client Jobs sheet.":"Songwriting jobs you're on. Tick tasks and update details here; FreeWorld sees your changes straight away."));
   const inSvc=j=>fSvc==="All"||svcOf(j)===fSvc;const byA=byArtist("job");const ja=D.jobs.filter(byA);
   const list=ja.filter(inSvc);
   stageTiles(box,JOB_STAGES,list,jobStage);
@@ -675,11 +675,11 @@ function renderJobs(){
 }
 function jobRow(j){
   const st=jobStats(j.tasks);const r=el("button","row");r.type="button";r.onclick=()=>openJob(j);
-  const t=el("div","t",j.title||"Untitled job");if(!j.id)t.appendChild(el("span","tag warn","Waiting for sync"));
+  const t=el("div","t",j.title||"Untitled job");if(!j.id)t.appendChild(el("span","tag warn","Open and save to set up"));
   t.appendChild(el("span","meta",[j.client||"No client",j.primary&&!same(j.primary,j.client)?"Artist: "+j.primary:"",j.pkg?j.pkg+" · "+PKGS[j.pkg]:"",j.owner?"Co-ordinator: "+j.owner:""].filter(Boolean).join(" · ")));
   const n=el("div","next");
   if(st.next){n.append(el("span",null,"Next: "+st.next.name));if(st.next.who)n.appendChild(el("span","meta",st.next.who));}
-  else n.appendChild(el("em",null,j.tasks.length?"Job complete":"Tasks appear after the next sync"));
+  else n.appendChild(el("em",null,j.tasks.length?"Job complete":"Open and save to create its tasks"));
   if(st.per.length)n.appendChild(miniBar(st.per));
   const di=dueInfo(j.due);r.append(t,n,el("div","due "+(st.cur<0&&j.tasks.length?"":di.cls),j.due?di.txt:"No deadline"));return r;
 }
@@ -859,8 +859,8 @@ function openJob(j){
   $("j_title").value=dJ.title;$("j_client").value=dJ.client;$("j_ctype").value=CLIENT_TYPES.includes(dJ.clientType)?dJ.clientType:"Other";$("j_primary").value=dJ.primary;$("j_others").value=dJ.others.join(", ");
   $("j_pkg").value=dJ.pkg||"E2";$("j_due").value=dJ.due;$("j_notes").value=dJ.notes;$("j_status").textContent="";
   jOpen={};jDrawOwner();jDrawExtras();jDrawHead();jDrawStages();jDrawCredits();jDrawMoney();
-  $("j_syncnote").textContent=!j?"New jobs reach the Studio Desk at the next hourly sync, and their task list appears after that.":!j.id?"This job is waiting for the hourly sync with the Studio Desk. You can change it once it has synced.":j.updated?"Last changed in the Studio Desk "+j.updated+".":"";
-  show("jobForm");lockForm($("jobForm"),!!j&&!j.editable,"j_lock","Waiting for sync");if(!j)$("j_title").focus();
+  $("j_syncnote").textContent=!j?"The task list is built from the package as soon as you save.":!j.id?"Save this job to create its task list.":j.updated?"Last updated "+j.updated+".":"";
+  show("jobForm");lockForm($("jobForm"),!!j&&!j.editable,"j_lock","View only");if(!j)$("j_title").focus();
 }
 function jDrawOwner(){const box=$("j_owner");box.innerHTML="";D.team.forEach(t=>{const b=el("button",null,t);b.type="button";b.setAttribute("aria-pressed",String(dJ.owner===t));b.onclick=()=>{dJ.owner=dJ.owner===t?"":t;jDrawOwner();jDrawHead();};box.appendChild(b);});}
 function jDrawExtras(){const box=$("j_extras");box.innerHTML="";EXTRAS.forEach(x=>{const on=dJ.extras.includes(x);const b=el("button","pill",(on?"✓ ":"+ ")+x);b.type="button";b.setAttribute("aria-pressed",String(on));b.onclick=()=>{dJ.extras=on?dJ.extras.filter(y=>y!==x):[...dJ.extras,x];jDrawExtras();};box.appendChild(b);});}
