@@ -39,6 +39,7 @@ h1{font-weight:700;font-size:clamp(30px,6vw,44px);letter-spacing:-.03em;line-hei
 h1 em{font-family:var(--serif);font-weight:400;font-style:italic;color:var(--accent)}
 .who{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
 .who b{color:var(--ink);font-weight:600}
+.savestate{font-size:12px;color:var(--accent-ink)}.savestate.err{color:var(--bad)}
 .btn{background:var(--accent);color:var(--on-accent);border:0;border-radius:8px;padding:10px 16px;font-weight:600}
 .btn:disabled{opacity:.6;cursor:default}
 .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
@@ -220,7 +221,7 @@ button.pill[aria-pressed="true"]{border-color:var(--accent);color:var(--accent-i
       <div class="eyebrow">FreeWorld · Own your $hit</div>
       <h1>Artist <em>Portal</em></h1>
     </div>
-    <div class="who"><span id="whoText"></span><button class="btn ghost sm" type="button" id="refreshBtn">Refresh</button><button class="btn ghost sm" type="button" id="signOut">Sign out</button></div>
+    <div class="who"><span class="savestate" id="saveState" aria-live="polite"></span><span id="whoText"></span><button class="btn ghost sm" type="button" id="refreshBtn">Refresh</button><button class="btn ghost sm" type="button" id="signOut">Sign out</button></div>
   </header>
   <nav class="tabs" id="tabs" role="tablist" aria-label="Sections"></nav>
   <p class="banner" id="appMsg" hidden></p>
@@ -477,12 +478,12 @@ async function start(){
   await reload();
 }
 async function reload(){
-  try{D=await api("load");loadedAt=Date.now();appMsg("");render();}
+  try{const r=await api("load");if(pending)return;D=r;loadedAt=Date.now();appMsg("");render();}
   catch(err){if(err.code==="signed_out")return;if(D){appMsg(err.message,true);}else{$("view").innerHTML="";$("view").appendChild(el("div","empty",err.message));}}
 }
 function appMsg(t,err){const m=$("appMsg");m.hidden=!t;m.textContent=t||"";m.className="banner"+(err?" err":"");}
 $("refreshBtn").onclick=async()=>{const b=$("refreshBtn");b.disabled=true;b.textContent="Refreshing…";await reload();b.disabled=false;b.textContent="Refresh";};
-document.addEventListener("visibilitychange",()=>{if(!document.hidden&&D&&$("drawer").hidden&&Date.now()-loadedAt>60000)reload();});
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&D&&!pending&&$("drawer").hidden&&Date.now()-loadedAt>60000)reload();});
 
 /* ---------- maths ---------- */
 function songStats(flow){
@@ -722,11 +723,25 @@ function lockForm(form,locked,msgId,msg){
   form.querySelectorAll(".p-body input,.p-body select,.p-body textarea,.p-body .link,.p-body .x,.p-body .pill,.p-body .toggle button,.p-head input,.p-head .toggle button").forEach(e=>e.disabled=locked);
   form.querySelector("button[type=submit]").hidden=locked;$(msgId).textContent=locked?msg:"";
 }
-async function save(form,statusId,action,body){
-  const st=$(statusId);form.classList.add("saving");st.textContent="Saving…";
-  try{D=await api(action,body);loadedAt=Date.now();closeDrawer();}
-  catch(err){st.textContent=err.message;}
-  finally{form.classList.remove("saving");}
+/* Saving is optimistic: the panel closes at once, the board shows the change, and the sheet write finishes in the background, one save at a time. */
+let saveQueue=Promise.resolve(),pending=0;
+function saveState(t,err){const e=$("saveState");e.textContent=t||"";e.className="savestate"+(err?" err":"");}
+function patchLocal(action,body){
+  const put=(list,match,item)=>{const i=list.findIndex(match);if(i>=0)list[i]=Object.assign({},list[i],item);else list.push(Object.assign({editable:true},item));};
+  if(action==="saveSong"){const s=body.song;put(D.songs,x=>s.id&&x.id===s.id,clone(s));}
+  else if(action==="saveProject"){const p=body.project;put(D.projects,x=>body.oldName&&x.name===body.oldName,clone(p));if(body.oldName&&body.oldName!==p.name)D.songs.forEach(x=>{if(x.project===body.oldName)x.project=p.name;});}
+  else if(action==="saveJob"){const j=clone(body.job);j.tasks=j.tasks.map(t=>({stage:t.stage,name:t.name,done:t.done,who:t.who,key:t.key}));put(D.jobs,x=>(j.id&&x.id===j.id)||(!j.id&&j.row&&x.row===j.row),j);}
+  else if(action==="saveOp"){const o=body.op;put(D.ops,x=>o.id&&x.id===o.id,Object.assign(clone(o),{createdBy:o.id?undefined:D.me.name}));}
+  else if(action==="deleteOp")D.ops=D.ops.filter(x=>x.id!==body.id);
+}
+function save(form,statusId,action,body){
+  const label=action==="deleteOp"?"Deleting…":"Saving…";
+  try{patchLocal(action,body);}catch(e){}
+  closeDrawer();pending++;saveState(label);
+  saveQueue=saveQueue.then(async()=>{
+    try{const res=await api(action,body);pending--;if(!pending){D=res;loadedAt=Date.now();render();saveState("Saved");setTimeout(()=>{if(!pending)saveState("");},1500);}}
+    catch(err){pending--;saveState("Not saved",true);if(err.code==="signed_out")return;if(!pending)await reload();appMsg("Your last change wasn't saved: "+err.message,true);}
+  });
 }
 function credRows(boxId,list,onChange){
   const box=$(boxId);box.innerHTML="";
