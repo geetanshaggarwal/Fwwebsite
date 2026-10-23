@@ -273,7 +273,7 @@ button.pill[aria-pressed="true"]{border-color:var(--accent);color:var(--accent-i
       </section>
       <p class="status" id="s_status"></p>
     </div>
-    <div class="p-foot"><span class="status" id="s_lock"></span><span style="display:flex;gap:8px"><button class="btn ghost" type="button" data-close>Cancel</button><button class="btn" type="submit">Save</button></span></div>
+    <div class="p-foot"><button class="btn ghost danger" type="button" id="s_del">Delete</button><span class="status" id="s_lock"></span><span style="display:flex;gap:8px;margin-left:auto"><button class="btn ghost" type="button" data-close>Cancel</button><button class="btn" type="submit">Save</button></span></div>
   </form>
 
   <!-- project -->
@@ -346,7 +346,7 @@ button.pill[aria-pressed="true"]{border-color:var(--accent);color:var(--accent-i
       <p class="hint" id="j_syncnote"></p>
       <p class="status" id="j_status"></p>
     </div>
-    <div class="p-foot"><span class="status" id="j_lock"></span><span style="display:flex;gap:8px"><button class="btn ghost" type="button" data-close>Cancel</button><button class="btn" type="submit">Save</button></span></div>
+    <div class="p-foot"><button class="btn ghost danger" type="button" id="j_del">Delete</button><span class="status" id="j_lock"></span><span style="display:flex;gap:8px;margin-left:auto"><button class="btn ghost" type="button" data-close>Cancel</button><button class="btn" type="submit">Save</button></span></div>
   </form>
 
   <!-- operation -->
@@ -733,9 +733,11 @@ function patchLocal(action,body){
   else if(action==="saveJob"){const j=clone(body.job);j.tasks=j.tasks.map(t=>({stage:t.stage,name:t.name,done:t.done,who:t.who,key:t.key}));put(D.jobs,x=>(j.id&&x.id===j.id)||(!j.id&&j.row&&x.row===j.row),j);}
   else if(action==="saveOp"){const o=body.op;put(D.ops,x=>o.id&&x.id===o.id,Object.assign(clone(o),{createdBy:o.id?undefined:D.me.name}));}
   else if(action==="deleteOp")D.ops=D.ops.filter(x=>x.id!==body.id);
+  else if(action==="deleteSong")D.songs=D.songs.filter(x=>x.id!==body.id);
+  else if(action==="deleteJob")D.jobs=D.jobs.filter(x=>body.id?x.id!==body.id:x.row!==body.row);
 }
 function save(form,statusId,action,body){
-  const label=action==="deleteOp"?"Deleting…":"Saving…";
+  const label=/^delete/.test(action)?"Deleting…":"Saving…";
   try{patchLocal(action,body);}catch(e){}
   closeDrawer();pending++;saveState(label);
   saveQueue=saveQueue.then(async()=>{
@@ -770,6 +772,7 @@ function openSong(s){
   fill($("s_project"),[{value:"",label:"Single (no project)"},...D.projects.map(p=>({value:p.name,label:p.name}))]);$("s_project").value=dS.project;
   sOpen={};drawSongHead();drawSongStages();drawArtists();drawSongCredits();drawMeta();drawSplits();show("songForm");
   lockForm($("songForm"),!!s&&!s.editable,"s_lock","View only: you can edit songs where you're one of the artists.");
+  $("s_del").hidden=!s||!s.id||!isTeam();
   if(!s)$("s_title").focus();
 }
 function songWho(){return [...new Set([...D.team,...dS.artists.filter(Boolean),...dS.credits.filter(c=>["Lyricist","Producer","Mix engineer","Mastering engineer","Recording engineer","Composer"].includes(c.role)).map(c=>c.name),dS.engineer].filter(Boolean))];}
@@ -875,7 +878,7 @@ function openJob(j){
   $("j_pkg").value=dJ.pkg||"E2";$("j_due").value=dJ.due;$("j_notes").value=dJ.notes;$("j_status").textContent="";
   jOpen={};jDrawOwner();jDrawExtras();jDrawHead();jDrawStages();jDrawCredits();jDrawMoney();
   $("j_syncnote").textContent=!j?"The task list is built from the package as soon as you save.":!j.id?"Save this job to create its task list.":j.updated?"Last updated "+j.updated+".":"";
-  show("jobForm");lockForm($("jobForm"),!!j&&!j.editable,"j_lock","View only");if(!j)$("j_title").focus();
+  show("jobForm");lockForm($("jobForm"),!!j&&!j.editable,"j_lock","View only");$("j_del").hidden=!j||!isTeam();if(!j)$("j_title").focus();
 }
 function jDrawOwner(){const box=$("j_owner");box.innerHTML="";D.team.forEach(t=>{const b=el("button",null,t);b.type="button";b.setAttribute("aria-pressed",String(dJ.owner===t));b.onclick=()=>{dJ.owner=dJ.owner===t?"":t;jDrawOwner();jDrawHead();};box.appendChild(b);});}
 function jDrawExtras(){const box=$("j_extras");box.innerHTML="";EXTRAS.forEach(x=>{const on=dJ.extras.includes(x);const b=el("button","pill",(on?"✓ ":"+ ")+x);b.type="button";b.setAttribute("aria-pressed",String(on));b.onclick=()=>{dJ.extras=on?dJ.extras.filter(y=>y!==x):[...dJ.extras,x];jDrawExtras();};box.appendChild(b);});}
@@ -961,9 +964,12 @@ function oDrawTasks(){
 }
 function oAdd(){const v=$("o_new").value.trim();if(!v)return;dO.tasks.push({id:"",name:v,who:"",due:"",done:false});$("o_new").value="";oDrawTasks();oDrawHead();$("o_new").focus();}
 $("o_add").onclick=oAdd;$("o_new").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();oAdd();}});
-let delArmed=false;
-$("o_del").onclick=()=>{if(!editOp)return;if(!delArmed){delArmed=true;$("o_del").textContent="Tap again to delete";setTimeout(()=>{delArmed=false;$("o_del").textContent="Delete";},3000);return;}
-  delArmed=false;$("o_del").textContent="Delete";save($("opForm"),"o_status","deleteOp",{id:editOp.id});};
+/* Delete (team only): tap once to arm, tap again within 3 seconds to delete */
+function armDelete(btnId,go){let armed=false,timer=0;$(btnId).onclick=()=>{const b=$(btnId);if(!armed){armed=true;b.textContent="Tap again to delete";timer=setTimeout(()=>{armed=false;b.textContent="Delete";},3000);return;}
+  clearTimeout(timer);armed=false;b.textContent="Delete";go();};}
+armDelete("o_del",()=>{if(editOp)save($("opForm"),"o_status","deleteOp",{id:editOp.id});});
+armDelete("s_del",()=>{if(editSong&&editSong.id)save($("songForm"),"s_status","deleteSong",{id:editSong.id});});
+armDelete("j_del",()=>{if(editJob)save($("jobForm"),"j_status","deleteJob",{id:editJob.id||"",row:editJob.id?0:editJob.row});});
 $("opForm").addEventListener("submit",e=>{
   e.preventDefault();const st=$("o_status");
   if($("o_new").value.trim())oAdd();
