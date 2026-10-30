@@ -634,7 +634,7 @@ function renderSongs(){
 }
 function songRow(s){
   const st=songStats(s.flow);const r=el("button","row");r.type="button";r.onclick=()=>openSong(s);
-  const t=el("div","t",s.title);if(!s.editable)t.appendChild(el("span","tag","View only"));
+  const t=el("div","t",s.title);if(s._pending)t.appendChild(el("span","tag","Saving…"));if(!s.editable)t.appendChild(el("span","tag","View only"));
   t.appendChild(el("span","meta",[s.artists.join(", "),s.project||"Single"].filter(Boolean).join(" · ")));
   const n=el("div","next");
   if(st.next){n.append(el("span",null,(s.released?"Released · open: ":"Next: ")+st.next.name));if(st.next.who)n.appendChild(el("span","meta",st.next.who));}
@@ -676,7 +676,7 @@ function renderJobs(){
 }
 function jobRow(j){
   const st=jobStats(j.tasks);const r=el("button","row");r.type="button";r.onclick=()=>openJob(j);
-  const t=el("div","t",j.title||"Untitled job");if(!j.id)t.appendChild(el("span","tag warn","Open and save to set up"));
+  const t=el("div","t",j.title||"Untitled job");if(j._pending)t.appendChild(el("span","tag","Saving…"));else if(!j.id)t.appendChild(el("span","tag warn","Open and save to set up"));
   t.appendChild(el("span","meta",[j.client||"No client",j.primary&&!same(j.primary,j.client)?"Artist: "+j.primary:"",j.pkg?j.pkg+" · "+PKGS[j.pkg]:"",j.owner?"Co-ordinator: "+j.owner:""].filter(Boolean).join(" · ")));
   const n=el("div","next");
   if(st.next){n.append(el("span",null,"Next: "+st.next.name));if(st.next.who)n.appendChild(el("span","meta",st.next.who));}
@@ -723,11 +723,13 @@ function lockForm(form,locked,msgId,msg){
   form.querySelectorAll(".p-body input,.p-body select,.p-body textarea,.p-body .link,.p-body .x,.p-body .pill,.p-body .toggle button,.p-head input,.p-head .toggle button").forEach(e=>e.disabled=locked);
   form.querySelector("button[type=submit]").hidden=locked;$(msgId).textContent=locked?msg:"";
 }
+/* A card added a moment ago has no sheet id until its save returns; opening it again then would add it a second time. */
+function stillSaving(x){if(x&&x._pending){appMsg("That one is still saving. It will open in a moment.");setTimeout(()=>{if($("appMsg").textContent.startsWith("That one is still saving"))appMsg("");},3000);return true;}return false;}
 /* Saving is optimistic: the panel closes at once, the board shows the change, and the sheet write finishes in the background, one save at a time. */
 let saveQueue=Promise.resolve(),pending=0;
 function saveState(t,err){const e=$("saveState");e.textContent=t||"";e.className="savestate"+(err?" err":"");}
 function patchLocal(action,body){
-  const put=(list,match,item)=>{const i=list.findIndex(match);if(i>=0)list[i]=Object.assign({},list[i],item);else list.push(Object.assign({editable:true},item));};
+  const put=(list,match,item)=>{const i=list.findIndex(match);if(i>=0)list[i]=Object.assign({},list[i],item);else list.push(Object.assign({editable:true,_pending:true},item));};
   if(action==="saveSong"){const s=body.song;put(D.songs,x=>s.id&&x.id===s.id,clone(s));}
   else if(action==="saveProject"){const p=body.project;put(D.projects,x=>body.oldName&&x.name===body.oldName,clone(p));if(body.oldName&&body.oldName!==p.name)D.songs.forEach(x=>{if(x.project===body.oldName)x.project=p.name;});}
   else if(action==="saveJob"){const j=clone(body.job);j.tasks=j.tasks.map(t=>({stage:t.stage,name:t.name,done:t.done,who:t.who,key:t.key}));put(D.jobs,x=>(j.id&&x.id===j.id)||(!j.id&&j.row&&x.row===j.row),j);}
@@ -766,6 +768,7 @@ function segBar(boxId,per,cur){
 /* song panel */
 let editSong=null,dS={},sOpen={};
 function openSong(s){
+  if(stillSaving(s))return;
   editSong=s;dS=s?clone(s):{title:"",artists:isTeam()?(fArtist!=="All"&&fArtist!=="FreeWorld"?[fArtist]:[]):[D.me.name],project:fProj!=="All"&&fProj!=="Singles"?fProj:"",released:false,due:"",flow:{},credits:[],meta:{label:"FreeWorld Studios"},engineer:"",sessions:[],mixVersions:[],notes:"",splits:{comp:[],master:[]},rights:{}};
   FLOW.forEach(f=>f.tasks.forEach(t=>{dS.flow[t.id]=dS.flow[t.id]||{done:false,who:""};}));
   $("s_title").value=dS.title;$("s_due").value=dS.due;$("s_notes").value=dS.notes;$("s_status").textContent="";
@@ -853,6 +856,7 @@ $("songForm").addEventListener("submit",e=>{
 let editProj=null;
 fill($("pr_type"),PTYPES);
 function openProj(p){
+  if(stillSaving(p))return;
   editProj=p;$("pr_name").value=p?.name||"";$("pr_artist").value=p?.artist||(isTeam()?"":D.me.name);$("pr_type").value=p?.type||"EP";$("pr_planned").value=p?.planned||"";$("pr_due").value=p?.due||"";$("pr_notes").value=p?.notes||"";$("pr_status").textContent="";
   const box=$("pr_tracks");box.innerHTML="";
   if(p){const s=projStats(p);$("pr_pct").textContent=s.pct+"% complete";$("pr_cnt").textContent=s.done+" of "+s.planned+" released";$("pr_bar").style.width=s.pct+"%";
@@ -872,6 +876,7 @@ $("projForm").addEventListener("submit",e=>{
 let editJob=null,dJ={},jOpen={};
 fill($("j_ctype"),CLIENT_TYPES);fill($("j_pkg"),Object.entries(PKGS).map(([k,v])=>({value:k,label:k+" · "+v})));
 function openJob(j){
+  if(stillSaving(j))return;
   editJob=j;dJ=j?clone(j):{id:"",title:"",client:"",clientType:"Independent artist",primary:isTeam()?(fArtist!=="All"&&fArtist!=="FreeWorld"?fArtist:""):D.me.name,others:[],pkg:"E2",extras:[],owner:"",due:"",credits:[],notes:"",tasks:[],payments:[]};
   dJ.tasks.forEach(t=>t.isNew=false);
   $("j_title").value=dJ.title;$("j_client").value=dJ.client;$("j_ctype").value=CLIENT_TYPES.includes(dJ.clientType)?dJ.clientType:"Other";$("j_primary").value=dJ.primary;$("j_others").value=dJ.others.join(", ");
@@ -934,6 +939,7 @@ $("jobForm").addEventListener("submit",e=>{
 let editOp=null,dO={};
 function opWho(){const a=$("o_artist").value;return [...new Set([...(a?[a,...((D.aliases||{})[a]||[])]:[]),...D.team])];}
 function openOp(o){
+  if(stillSaving(o))return;
   editOp=o;dO=o?clone(o):{id:"",title:"",artist:isTeam()?(fArtist!=="All"&&fArtist!=="FreeWorld"?fArtist:""):D.me.name,due:"",notes:"",tasks:[]};
   $("o_title").value=dO.title;$("o_due").value=dO.due;$("o_notes").value=dO.notes;$("o_status").textContent="";$("o_new").value="";
   const arts=isTeam()?[{value:"",label:"FreeWorld (no artist)"},...[...new Set([...D.artists,dO.artist].filter(Boolean))].map(a=>({value:a,label:a}))]:[{value:dO.artist,label:dO.artist||"FreeWorld"}];
